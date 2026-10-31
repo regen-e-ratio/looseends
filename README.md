@@ -67,6 +67,12 @@ set -a; . ./.env.local; set +a
 SERVER_LOG=/tmp/server.log node e2e/full-flow.mjs     # needs Playwright installed globally (NODE_PATH)
 ```
 
+### Live smoke test
+Checks a deployed site without needing any secrets: health, redirects, security headers, auth guards, cron protection, a real sign-in email sent to Resend's test inbox (`delivered@resend.dev`), and rejection of bad links.
+```bash
+BASE_URL=https://www.looseends.life node e2e/live-smoke.mjs   # add NODE_USE_ENV_PROXY=1 behind an HTTP proxy
+```
+
 ## Security notes
 - Item contents and personal messages are encrypted at rest (AES-256-GCM, key derived from `ENCRYPTION_KEY`). Names and emails of contacts are not, because they're needed to send email.
 - Login, session, and access tokens are random 256-bit values. Only their SHA-256 hashes are stored.
