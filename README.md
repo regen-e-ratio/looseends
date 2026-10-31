@@ -1,4 +1,6 @@
-# Afterword
+# Loose Ends
+
+**https://www.looseends.life** · *Tie up your loose ends.*
 
 A private "dead man's switch" vault. People record their subscriptions, bank accounts, investments, insurance, online accounts and personal messages, and choose trusted contacts. If they stop answering periodic check-in emails, each contact receives a private link to exactly what was shared with them.
 

@@ -4,8 +4,11 @@ import { APP_NAME, appUrl } from "./config";
 
 export type Email = { to: string; subject: string; html: string; text: string; replyTo?: string };
 
+/** Sender is always shown as APP_NAME; EMAIL_FROM may be "Name <addr>" or a bare address. */
 function from(): string {
-  return process.env.EMAIL_FROM || `${APP_NAME} <onboarding@resend.dev>`;
+  const raw = process.env.EMAIL_FROM || "onboarding@resend.dev";
+  const address = raw.match(/<([^>]+)>/)?.[1] ?? raw.trim();
+  return `${APP_NAME.replace(/["<>]/g, "")} <${address}>`;
 }
 
 export function emailProvider(): "resend" | "smtp" | "console" {

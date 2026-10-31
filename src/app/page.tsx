@@ -21,13 +21,14 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       <main className="mx-auto w-full max-w-5xl flex-1 px-4">
         {deleted && <Alert tone="success" className="mb-6">Your account and all its data have been permanently deleted.</Alert>}
         <section className="py-14 sm:py-20">
-          <p className="text-sm font-medium uppercase tracking-wider text-teal-700">Peace of mind for the people you love</p>
+          <p className="text-sm font-medium uppercase tracking-wider text-teal-700">Tie up your loose ends</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-            If something happens to you, will anyone know what to take care of?
+            So the people you love aren&apos;t left untangling them.
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-stone-600">
-            {APP_NAME} is a private place to note your bank accounts, investments, subscriptions and last wishes. If you stop
-            checking in, we securely pass it on to the people you chose — and only them.
+            If something happened to you tomorrow, would anyone know about your bank accounts, investments, subscriptions or last
+            wishes? {APP_NAME} is a private place to write them down. If you stop checking in, we securely pass them on to the
+            people you chose — and only them.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <LinkButton href={user ? "/dashboard" : "/login"} className="px-6 py-3 text-base">

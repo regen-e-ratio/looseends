@@ -1,4 +1,4 @@
-# Setup guide: deploy Afterword (one-time, about 30–45 minutes)
+# Setup guide: deploy Loose Ends (one-time, about 30–45 minutes)
 
 You only do this once. After that, every change pushed to the `main` branch on GitHub deploys automatically, and the database schema updates itself during the deploy.
 
@@ -10,7 +10,7 @@ You only do this once. After that, every change pushed to the `main` branch on G
 | Hosting + daily job | **Vercel** (Hobby plan) | Free | Made for Next.js. Its built-in *Cron Jobs* run our daily "has this person checked in?" check, so we don't need a separate scheduler |
 | Database | **Neon Postgres**, added *through* Vercel | Free tier | One click inside Vercel. It creates the database and sets `DATABASE_URL` for you |
 | Email | **Resend** | Free tier (about 3,000 emails/month) | Simplest API, good deliverability, and its dashboard shows every email sent |
-| Email domain | Any domain you own (for example `afterword-yourname.com`) | About $10/year | **Required by Resend to email anyone other than yourself.** Contacts must receive emails from a real domain or the emails land in spam |
+| Email domain | Any domain you own (we use `looseends.life`) | About $10/year | **Required by Resend to email anyone other than yourself.** Contacts must receive emails from a real domain or the emails land in spam |
 
 > ⚠️ Vercel's free Hobby plan is for **personal, non-commercial** use. If you start charging users, upgrade to Pro ($20/month). No code changes are needed.
 
@@ -50,7 +50,8 @@ Call them **SECRET A** (encryption key) and **SECRET B** (cron secret).
    | `ENCRYPTION_KEY` | SECRET A |
    | `CRON_SECRET` | SECRET B |
    | `RESEND_API_KEY` | the `re_…` key from Resend |
-   | `EMAIL_FROM` | `Afterword <hello@yourdomain.com>` (must use the domain you verified in Resend) |
+   | `EMAIL_FROM` | `hello@looseends.life` (must use the domain you verified in Resend) |
+   | `APP_NAME` | *(optional)* defaults to `Loose Ends`; shown in the site and as the email sender name |
 
 4. Click **Deploy**. **The first deploy fails with "DATABASE_URL is not set". That's expected**, because there's no database yet.
 5. In the project, open the **Storage** tab → **Create Database** → **Neon** (Serverless Postgres) → pick the region closest to your users → accept the defaults → **Connect** it to the project, for all environments. This adds `DATABASE_URL` automatically.
@@ -72,7 +73,7 @@ That's it. 🎉
 ### Option B: Gmail instead of Resend (no domain needed)
 1. Turn on 2-Step Verification on the Google account, then create an App Password at https://myaccount.google.com/apppasswords.
 2. In Vercel, **don't** set `RESEND_API_KEY`. Set these instead:
-   `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USER=you@gmail.com`, `SMTP_PASS=<app password>`, `EMAIL_FROM=Afterword <you@gmail.com>`.
+   `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USER=you@gmail.com`, `SMTP_PASS=<app password>`, `EMAIL_FROM=you@gmail.com`.
 
 Gmail limits you to about 500 emails/day and is more likely to land in spam, so treat it as a stopgap.
 

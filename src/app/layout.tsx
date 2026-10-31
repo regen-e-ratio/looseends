@@ -4,7 +4,7 @@ import { APP_NAME } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
-  description: "Write down your accounts, subscriptions and wishes — and make sure they reach the right people if something happens to you.",
+  description: "Tie up your loose ends: write down your accounts, subscriptions and wishes, and make sure they reach the right people if something happens to you.",
   robots: { index: false, follow: false },
 };
 

@@ -10,22 +10,23 @@ function key(): Buffer {
     throw new Error("ENCRYPTION_KEY must be set to a random string of at least 32 characters");
   }
   // Derive a fixed 256-bit key from whatever string the operator provided.
-  cachedKey = createHash("sha256").update(`afterword:v1:${secret}`).digest();
+  // The label is part of the key: changing it requires re-encrypting stored data (see scripts/reencrypt.mjs).
+  cachedKey = createHash("sha256").update(`looseends:v2:${secret}`).digest();
   return cachedKey;
 }
 
-/** AES-256-GCM. Output format: v1.<iv>.<tag>.<ciphertext> (base64url). */
+/** AES-256-GCM. Output format: v2.<iv>.<tag>.<ciphertext> (base64url). */
 export function encrypt(plaintext: string): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key(), iv);
   const ct = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
-  return ["v1", iv.toString("base64url"), tag.toString("base64url"), ct.toString("base64url")].join(".");
+  return ["v2", iv.toString("base64url"), tag.toString("base64url"), ct.toString("base64url")].join(".");
 }
 
 export function decrypt(value: string): string {
   const [version, iv, tag, ct] = value.split(".");
-  if (version !== "v1" || !iv || !tag || ct === undefined) throw new Error("Unrecognised ciphertext");
+  if (version !== "v2" || !iv || !tag || ct === undefined) throw new Error("Unrecognised ciphertext");
   const decipher = createDecipheriv("aes-256-gcm", key(), Buffer.from(iv, "base64url"));
   decipher.setAuthTag(Buffer.from(tag, "base64url"));
   return Buffer.concat([decipher.update(Buffer.from(ct, "base64url")), decipher.final()]).toString("utf8");

@@ -7,7 +7,7 @@ import { db, schema } from "@/db";
 import { hashToken, newToken } from "./crypto";
 import { LOGIN_TOKEN_MINUTES, SESSION_DAYS } from "./config";
 
-const COOKIE = "aw_session";
+const COOKIE = "le_session";
 const { users, sessions, loginTokens } = schema;
 
 export function normalizeEmail(email: string): string {

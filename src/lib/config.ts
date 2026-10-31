@@ -1,4 +1,4 @@
-export const APP_NAME = process.env.APP_NAME || "Afterword";
+export const APP_NAME = process.env.APP_NAME || "Loose Ends";
 
 /** Absolute base URL used in emails. */
 export function appUrl(): string {

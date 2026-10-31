@@ -113,7 +113,7 @@ try {
   step("data is encrypted at rest");
   const rows = await sql`select payload from items i join users u on u.id=i.user_id where u.email=${owner}`;
   assert.equal(rows.length, 3);
-  for (const r of rows) assert.ok(r.payload.startsWith("v1.") && !r.payload.includes("Netflix"));
+  for (const r of rows) assert.ok(r.payload.startsWith("v2.") && !r.payload.includes("Netflix"));
 
   step("preview as Anna (no bank)");
   await page.goto(`${BASE}/contacts`);
