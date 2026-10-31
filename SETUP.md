@@ -18,7 +18,7 @@ You only do this once. After that, every change pushed to the `main` branch on G
 
 ## Step 1: GitHub repository
 1. Go to https://github.com/new
-2. **Repository name:** `afterword`. **Visibility:** Private. **Do not** add a README, .gitignore or license, so the repo stays empty.
+2. **Repository name:** `looseends`. **Visibility:** Private. **Do not** add a README, .gitignore or license, so the repo stays empty.
 3. Click **Create repository**.
 4. Tell Claude that it's created. Claude pushes the code.
 
@@ -42,7 +42,7 @@ Call them **SECRET A** (encryption key) and **SECRET B** (cron secret).
 
 ## Step 4: Vercel project and database
 1. Sign up at https://vercel.com with **Continue with GitHub**.
-2. **Add New… → Project** → import the `afterword` repository. If it's not listed, click *Adjust GitHub App Permissions* and grant access to it.
+2. **Add New… → Project** → import the `looseends` repository. If it's not listed, click *Adjust GitHub App Permissions* and grant access to it.
 3. Leave all build settings at their defaults. Open **Environment Variables** on the same screen and add:
 
    | Name | Value |
