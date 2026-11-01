@@ -15,7 +15,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const steps = [
     { done: items.length > 0, label: "Add your first item", href: "/items/new?kind=subscription" },
     { done: contacts.length > 0, label: "Add a trusted contact", href: "/contacts/new" },
-    { done: user.switchEnabled, label: "Turn on your check-in switch", href: "/settings" },
+    { done: user.switchEnabled, label: "Turn on your release switch", href: "/settings" },
   ];
   const setupDone = steps.every((s) => s.done);
 
@@ -28,8 +28,13 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
       {sp.saved && <Alert tone="success">Saved.</Alert>}
       {sp.checkedIn && <Alert tone="success">Thanks — you&apos;re checked in and your timer has been reset.</Alert>}
+      {sp.rejected && <Alert tone="success">Request rejected. We&apos;ve let your contact know you&apos;re OK.</Alert>}
 
-      <SwitchStatus user={user} recipientCount={contacts.length} />
+      <SwitchStatus
+        user={user}
+        recipientCount={contacts.length}
+        claimantName={contacts.find((c) => c.id === user.claimRecipientId)?.name ?? null}
+      />
 
       {!setupDone && (
         <Card>

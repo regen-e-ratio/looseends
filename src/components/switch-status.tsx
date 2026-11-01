@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { User } from "@/db/schema";
 import { checkInAction, resetAfterReleaseAction } from "@/app/actions/settings";
-import { nextCheckInDue, releaseDate } from "@/lib/switch";
+import { isClaimPending, nextCheckInDue, releaseDate } from "@/lib/switch";
 import { SubmitButton } from "./submit-button";
 import { cx, daysUntil, formatDate, LinkButton } from "./ui";
 
-export function SwitchStatus({ user, recipientCount }: { user: User; recipientCount: number }) {
+export function SwitchStatus({ user, recipientCount, claimantName }: { user: User; recipientCount: number; claimantName?: string | null }) {
   if (user.switchStatus === "triggered") {
     return (
       <Panel tone="red" title="Your vault has been released" icon="🔓">
@@ -40,6 +40,38 @@ export function SwitchStatus({ user, recipientCount }: { user: User; recipientCo
     );
   }
 
+  if (user.switchMode === "claim") {
+    if (isClaimPending(user)) {
+      const release = releaseDate(user);
+      return (
+        <Panel tone="red" title={`${claimantName ?? "A trusted contact"} requested access to your vault`} icon="🔔">
+          <p>
+            They asked on {formatDate(user.warningStartedAt ?? new Date())}, which usually means they believe something has happened to you. Unless you
+            reject it, your vault will be released to your {recipientCount} contact{recipientCount === 1 ? "" : "s"} on{" "}
+            <strong>{formatDate(release)}</strong> ({Math.max(0, daysUntil(release))} days). Opening the app does not cancel it.
+          </p>
+          <form action={checkInAction} className="mt-4">
+            <SubmitButton variant="danger" pendingText="Rejecting…">
+              I&apos;m OK — reject this request
+            </SubmitButton>
+          </form>
+        </Panel>
+      );
+    }
+    return (
+      <Panel tone="green" title="Your contacts can request access" icon="🤝">
+        <p>
+          No check-in emails. If something happens to you, any of your{" "}
+          <Link href="/contacts" className="underline">
+            {recipientCount} trusted contact{recipientCount === 1 ? "" : "s"}
+          </Link>{" "}
+          can request access with their personal link. You&apos;ll then have <strong>{user.gracePeriodDays} days</strong> to reject it before
+          anything is released.
+        </p>
+      </Panel>
+    );
+  }
+
   const due = nextCheckInDue(user);
   if (user.switchStatus === "warning") {
     const release = releaseDate(user);
@@ -59,7 +91,7 @@ export function SwitchStatus({ user, recipientCount }: { user: User; recipientCo
     <Panel tone="green" title="Your switch is active" icon="🛡️">
       <p>
         Next check-in due <strong>{formatDate(due)}</strong> (in {days} day{days === 1 ? "" : "s"}). We&apos;ll email you a one-click
-        link; signing in also counts. If you don&apos;t respond within {user.gracePeriodDays} days of reminders, your information goes to{" "}
+        link; opening the app also counts, so you&apos;re checked in right now. If you don&apos;t respond within {user.gracePeriodDays} days of reminders, your information goes to{" "}
         <Link href="/contacts" className="underline">
           {recipientCount} contact{recipientCount === 1 ? "" : "s"}
         </Link>

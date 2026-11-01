@@ -15,7 +15,7 @@ export type VaultItem = ItemPayload & {
   updatedAt: Date;
 };
 
-export type RecipientView = Omit<Recipient, "personalMessage" | "accessTokenHash"> & {
+export type RecipientView = Omit<Recipient, "personalMessage" | "accessTokenHash" | "claimTokenHash"> & {
   personalMessage: string | null;
 };
 
@@ -61,7 +61,7 @@ export async function getRecipient(userId: string, id: string): Promise<Recipien
 
 export function toRecipientView(r: Recipient): RecipientView {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { accessTokenHash, personalMessage, ...rest } = r;
+  const { accessTokenHash, claimTokenHash, personalMessage, ...rest } = r;
   return { ...rest, personalMessage: decryptNullable(personalMessage) };
 }
 

@@ -7,6 +7,7 @@ import { db, schema } from "@/db";
 import { normalizeEmail, requireUser } from "@/lib/auth";
 import { encryptNullable } from "@/lib/crypto";
 import { contactAddedEmail, sendEmail } from "@/lib/email";
+import { dropClaim, sendClaimInvite } from "@/lib/switch";
 import type { FormState } from "./vault";
 
 const { recipients } = schema;
@@ -34,24 +35,39 @@ export async function saveContactAction(_prev: FormState, formData: FormData): P
 
   const values = { name, email, relationship: relationship || null, personalMessage: encryptNullable(personalMessage) };
 
+  const claimMode = user.switchEnabled && user.switchMode === "claim";
+
   if (id) {
-    const updated = await db
-      .update(recipients)
-      .set(values)
-      .where(and(eq(recipients.id, id), eq(recipients.userId, user.id)))
-      .returning({ id: recipients.id });
-    if (updated.length === 0) return { error: "Contact not found." };
-    redirect("/contacts?saved=1");
+    const before = await db.query.recipients.findFirst({ where: and(eq(recipients.id, id), eq(recipients.userId, user.id)) });
+    if (!before) return { error: "Contact not found." };
+    const [updated] = await db.update(recipients).set(values).where(eq(recipients.id, id)).returning();
+    // New address in claim mode: the old personal link goes to the wrong person, so issue a new one.
+    let failed = false;
+    if (claimMode && before.email !== email) {
+      await sendClaimInvite(user, updated).catch((e) => {
+        console.error("claim invite failed", e);
+        failed = true;
+      });
+    }
+    redirect(`/contacts?saved=1${failed ? "&notifyFailed=1" : ""}`);
   }
 
   const existing = await db.select({ email: recipients.email }).from(recipients).where(eq(recipients.userId, user.id));
   if (existing.length >= MAX_CONTACTS) return { error: `You can add up to ${MAX_CONTACTS} contacts.` };
   if (existing.some((r) => r.email === email)) return { fieldErrors: { email: ["You already added this person."] } };
 
-  const [row] = await db.insert(recipients).values({ ...values, userId: user.id }).returning({ id: recipients.id });
+  const [row] = await db.insert(recipients).values({ ...values, userId: user.id }).returning();
 
   let notifyFailed = false;
-  if (formData.get("notify") === "on") {
+  if (claimMode) {
+    // In claim mode every contact must have their personal "request access" link.
+    try {
+      await sendClaimInvite(user, row);
+    } catch (err) {
+      console.error("claim invite failed", err);
+      notifyFailed = true;
+    }
+  } else if (formData.get("notify") === "on") {
     try {
       await sendEmail(contactAddedEmail({ to: email, recipientName: name, ownerName: user.name || user.email, ownerEmail: user.email }));
       await db.update(recipients).set({ notifiedAt: new Date() }).where(eq(recipients.id, row.id));
@@ -66,6 +82,23 @@ export async function saveContactAction(_prev: FormState, formData: FormData): P
 export async function deleteContactAction(formData: FormData) {
   const user = await requireUser();
   const id = String(formData.get("id") ?? "");
-  await db.delete(recipients).where(and(eq(recipients.id, id), eq(recipients.userId, user.id)));
+  const deleted = await db.delete(recipients).where(and(eq(recipients.id, id), eq(recipients.userId, user.id))).returning({ id: recipients.id });
+  // Removing the person who made a pending claim cancels that claim.
+  if (deleted.length && user.claimRecipientId === id) await dropClaim(user.id);
   redirect("/contacts");
+}
+
+export async function resendClaimLinkAction(formData: FormData) {
+  const user = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  if (!(user.switchEnabled && user.switchMode === "claim")) redirect("/contacts");
+  const r = await db.query.recipients.findFirst({ where: and(eq(recipients.id, id), eq(recipients.userId, user.id)) });
+  if (!r) redirect("/contacts");
+  try {
+    await sendClaimInvite(user, r);
+  } catch (err) {
+    console.error("claim invite failed", err);
+    redirect("/contacts?notifyFailed=1");
+  }
+  redirect("/contacts?resent=1");
 }

@@ -168,21 +168,33 @@ try {
   let res = await cron();
   assert.ok(res.none >= 1 && res.trigger === 0, JSON.stringify(res));
 
-  step("8 days pass → reminder");
+  step("8 days pass → reminder email");
   await sql`update users set last_check_in_at = now() - interval '8 days' where email=${owner}`;
   res = await cron();
   assert.ok(res.start_warning >= 1, JSON.stringify(res));
   const checkLink = await lastLink(owner, "/check-in");
-  await page.goto(`${BASE}/dashboard`);
-  await page.getByText("We're waiting for your check-in").waitFor();
-  await shot("08-dashboard-warning");
 
-  step("one-click check-in from email");
-  await page.goto(checkLink);
-  await page.getByRole("button", { name: "I'm OK" }).click();
-  await page.getByRole("heading", { name: /you're checked in/ }).waitFor();
+  step("one-click check-in from the email (signed-out browser)");
+  const mail = await browser.newPage();
+  await mail.goto(checkLink);
+  await mail.getByRole("button", { name: "I'm OK" }).click();
+  await mail.getByRole("heading", { name: /you're checked in/ }).waitFor();
+  await mail.close();
   let [u] = await sql`select switch_status from users where email=${owner}`;
   assert.equal(u.switch_status, "active");
+
+  step("opening the app checks in automatically (also during reminders)");
+  await sql`update users set last_check_in_at = now() - interval '8 days' where email=${owner}`;
+  res = await cron();
+  assert.ok(res.start_warning >= 1, JSON.stringify(res));
+  [u] = await sql`select switch_status from users where email=${owner}`;
+  assert.equal(u.switch_status, "warning");
+  await page.goto(`${BASE}/dashboard`);
+  await page.getByText("Your switch is active").waitFor();
+  [u] = await sql`select switch_status, extract(epoch from now() - last_check_in_at) as age from users where email=${owner}`;
+  assert.equal(u.switch_status, "active");
+  assert.ok(Number(u.age) < 60, "last check-in was just now");
+  await shot("08-auto-checked-in");
 
   step("miss everything → release");
   await sql`update users set last_check_in_at = now() - interval '8 days' where email=${owner}`;
@@ -223,6 +235,80 @@ try {
   await page.getByText("Your switch is active").waitFor();
   await rp.goto(annaLink);
   await rp.getByRole("heading", { name: /link isn.t valid/ }).waitFor();
+
+  step("switch to claim mode → contacts get their personal links");
+  await page.goto(`${BASE}/settings`);
+  await page.getByRole("radio", { name: /Trusted contacts claim/ }).check();
+  await page.getByText("Saving will email 2 contacts their personal link").waitFor();
+  await page.getByRole("button", { name: "Save switch settings" }).click();
+  await page.getByText("We emailed 2 contacts their personal link").waitFor();
+  assert.ok(await page.getByRole("radio", { name: /Trusted contacts claim/ }).isChecked(), "selection survives saving");
+  await shot("11-settings-claim");
+  const annaClaim = await lastLink(anna, "/claim/");
+  const bobClaim = await lastLink(bob, "/claim/");
+  await page.goto(`${BASE}/dashboard`);
+  await page.getByText("Your contacts can request access").waitFor();
+  res = await cron();
+  [u] = await sql`select switch_status from users where email=${owner}`;
+  assert.equal(u.switch_status, "active", "claim mode never starts on its own");
+
+  step("opening the claim link changes nothing; pressing the button requests access");
+  const claimPage = await browser.newPage();
+  await claimPage.goto(annaClaim);
+  await claimPage.getByRole("heading", { name: /Request access to Joana Example/ }).waitFor();
+  [u] = await sql`select switch_status from users where email=${owner}`;
+  assert.equal(u.switch_status, "active");
+  const ownerMails = emailsTo(owner);
+  await claimPage.getByRole("button", { name: "Request access" }).click();
+  await claimPage.getByRole("heading", { name: "Your request has been sent" }).waitFor();
+  await claimPage.screenshot({ path: `${SHOTS}/12-claim-sent.png` });
+  assert.equal(emailsTo(owner), ownerMails + 1, "owner is notified");
+
+  step("owner opening the app does NOT cancel the claim; a second contact sees it's open");
+  await page.goto(`${BASE}/dashboard`);
+  await page.getByText("Anna Example requested access to your vault").waitFor();
+  await shot("13-dashboard-claim");
+  [u] = await sql`select switch_status from users where email=${owner}`;
+  assert.equal(u.switch_status, "warning");
+  const bobPage = await browser.newPage();
+  await bobPage.goto(bobClaim);
+  await bobPage.getByRole("heading", { name: "A request is already open" }).waitFor();
+
+  step("owner rejects → contact is told");
+  const annaMails = emailsTo(anna);
+  await page.getByRole("button", { name: /reject this request/ }).click();
+  await page.waitForURL("**/dashboard?rejected=1");
+  await page.getByText("Your contacts can request access").waitFor();
+  assert.equal(emailsTo(anna), annaMails + 1, "claimant gets the 'responded' email");
+
+  step("claim again → reminders → expiry releases to everyone");
+  await claimPage.goto(annaClaim);
+  await claimPage.getByRole("button", { name: "Request access" }).click();
+  await claimPage.getByRole("heading", { name: "Your request has been sent" }).waitFor();
+  await sql`update users set last_reminder_at = now() - interval '1 day' where email=${owner}`;
+  res = await cron();
+  assert.ok(res.remind >= 1, JSON.stringify(res));
+  await sql`update users set warning_started_at = now() - interval '4 days', last_reminder_at = now() - interval '1 day' where email=${owner}`;
+  res = await cron();
+  assert.ok(res.trigger >= 1, JSON.stringify(res));
+  await bobPage.goto(await lastLink(bob, "/access/"));
+  await bobPage.getByText("ING", { exact: true }).waitFor();
+  await claimPage.goto(annaClaim);
+  await claimPage.getByRole("heading", { name: "The information has been released" }).waitFor();
+
+  step("revoke, then back to email check-ins → claim links stop working");
+  await page.goto(`${BASE}/dashboard`);
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: /revoke access/ }).click();
+  await page.getByText("Your contacts can request access").waitFor();
+  await page.goto(`${BASE}/settings`);
+  await page.getByRole("radio", { name: /Email check-ins/ }).check();
+  await page.getByRole("button", { name: "Save switch settings" }).click();
+  await page.getByText("Saved. Your timer starts from today.").waitFor();
+  await claimPage.goto(annaClaim);
+  await claimPage.getByRole("heading", { name: "This link isn't valid" }).waitFor();
+  await claimPage.close();
+  await bobPage.close();
 
   step("cron auth");
   assert.equal((await fetch(`${BASE}/api/cron/check-switches`, { headers: { authorization: "Bearer nope" } })).status, 401);

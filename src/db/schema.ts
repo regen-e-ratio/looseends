@@ -23,14 +23,23 @@ export const users = pgTable("users", {
 
   // Dead man's switch
   switchEnabled: boolean("switch_enabled").notNull().default(false),
-  /** active = waiting for next check-in, warning = reminders being sent, triggered = info released */
+  /**
+   * How a release is triggered (never both):
+   * - checkin: we email the user every N days; missed check-ins + grace period → release
+   * - claim:   no emails; a trusted contact requests access and the user has gracePeriodDays to reject it
+   */
+  switchMode: text("switch_mode").$type<"checkin" | "claim">().notNull().default("checkin"),
+  /** active = nothing pending, warning = reminders being sent / claim pending, triggered = info released */
   switchStatus: text("switch_status").$type<"active" | "warning" | "triggered">().notNull().default("active"),
   checkInIntervalDays: integer("check_in_interval_days").notNull().default(30),
+  /** checkin mode: days of reminders before release. claim mode: days the user has to reject a claim. */
   gracePeriodDays: integer("grace_period_days").notNull().default(14),
   lastCheckInAt: tz("last_check_in_at").notNull().defaultNow(),
   warningStartedAt: tz("warning_started_at"),
   lastReminderAt: tz("last_reminder_at"),
   triggeredAt: tz("triggered_at"),
+  /** claim mode: the trusted contact whose access request is pending (status = warning). */
+  claimRecipientId: uuid("claim_recipient_id"),
   /** encrypted one-click "I'm OK" token included in reminder emails (stable for one warning period) */
   checkInToken: text("check_in_token"),
 });
@@ -75,6 +84,9 @@ export const recipients = pgTable(
     notifiedAt: tz("notified_at"),
     /** sha256 of the access link token, set when the switch is triggered */
     accessTokenHash: text("access_token_hash").unique(),
+    /** sha256 of this contact's personal "request access" link (claim mode only). */
+    claimTokenHash: text("claim_token_hash").unique(),
+    claimLinkSentAt: tz("claim_link_sent_at"),
     releasedAt: tz("released_at"),
   },
   (t) => [index("recipients_user_idx").on(t.userId)],

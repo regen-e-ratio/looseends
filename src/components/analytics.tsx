@@ -7,12 +7,12 @@ const UUID = /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\
 
 /**
  * Removes anything secret or personal from a URL before it is sent to analytics:
- * access-link tokens, check-in / sign-in tokens and record ids. Keeps landing-page
+ * access-link and claim-link tokens, check-in / sign-in tokens and record ids. Keeps landing-page
  * attribution (from, utm_*) so the funnel /for/<slug> → /login?from=<slug> → /welcome is visible.
  */
 export function redactUrl(raw: string): string {
   const url = new URL(raw);
-  url.pathname = url.pathname.replace(/^\/access\/[^/]+/, "/access/[token]").replace(UUID, "/[id]");
+  url.pathname = url.pathname.replace(/^\/(access|claim)\/[^/]+/, "/$1/[token]").replace(UUID, "/[id]");
   for (const key of [...url.searchParams.keys()]) {
     if (!KEEP_PARAMS.test(key)) url.searchParams.delete(key);
   }

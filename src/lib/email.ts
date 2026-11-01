@@ -159,3 +159,60 @@ export function contactAddedEmail(opts: { to: string; recipientName: string; own
     text: `Hi ${opts.recipientName},\n\n${opts.ownerName} (${opts.ownerEmail}) has named you as a trusted contact on ${APP_NAME}. You don't need to do anything now. If they ever stop responding to regular check-ins, you'll receive an email from us with a private link.`,
   };
 }
+
+// ---------- claim mode ----------
+
+function fmtDate(d: Date): string {
+  return d.toUTCString().replace(/ \d\d:\d\d:\d\d GMT$/, "");
+}
+
+/** Sent to each trusted contact when the owner uses claim mode: their personal "request access" link. */
+export function claimInviteEmail(opts: { to: string; recipientName: string; ownerName: string; ownerEmail: string; link: string; waitDays: number }): Email {
+  return {
+    to: opts.to,
+    subject: `${opts.ownerName} named you as a trusted contact`,
+    html: layout(
+      p(`Hi ${esc(opts.recipientName)},`) +
+        p(
+          `${esc(opts.ownerName)} (${esc(opts.ownerEmail)}) has named you as a trusted contact on ${esc(APP_NAME)}. They keep a private record of important information — accounts, subscriptions, personal messages — meant for you if something happens to them.`,
+        ) +
+        p(`<strong>You don't need to do anything now.</strong> Please keep this email. If something ever happens to ${esc(opts.ownerName)}, use the button below to request access.`) +
+        button(opts.link, "Request access") +
+        p(
+          `<span style="font-size:13px;color:#78716c">When you request access, ${esc(opts.ownerName)} is notified and has ${opts.waitDays} days to respond. If they don't, the information is released to you and their other trusted contacts. This link is personal — please don't share it.</span>`,
+        ),
+    ),
+    text: `Hi ${opts.recipientName},\n\n${opts.ownerName} (${opts.ownerEmail}) has named you as a trusted contact on ${APP_NAME}. You don't need to do anything now — please keep this email.\n\nIf something ever happens to ${opts.ownerName}, request access here:\n${opts.link}\n\n${opts.ownerName} will be notified and has ${opts.waitDays} days to respond. If they don't, the information is released to you and their other trusted contacts. This link is personal — please don't share it.`,
+  };
+}
+
+/** Sent to the owner when a contact requests access (and as reminders while it's pending). */
+export function claimPendingEmail(opts: { to: string; name: string | null; claimantName: string; link: string; releaseDate: Date; reminder?: boolean }): Email {
+  const date = fmtDate(opts.releaseDate);
+  return {
+    to: opts.to,
+    subject: `${opts.reminder ? "Reminder: " : ""}${opts.claimantName} requested access to your ${APP_NAME} vault`,
+    html: layout(
+      p(`Hi ${esc(opts.name || "there")},`) +
+        p(`${esc(opts.claimantName)} has requested access to your ${esc(APP_NAME)} vault, which usually means they believe something has happened to you.`) +
+        p(`<strong>If you're OK, reject the request with the button below. Otherwise your vault will be released to your trusted contacts on ${esc(date)}.</strong>`) +
+        button(opts.link, "I'm OK — reject this request") +
+        p(`<span style="font-size:13px;color:#78716c">${esc(opts.claimantName)} will be told you responded. If you didn't expect this, you can also remove them as a trusted contact after signing in.</span>`),
+    ),
+    text: `Hi ${opts.name || "there"},\n\n${opts.claimantName} has requested access to your ${APP_NAME} vault.\n\nIf you're OK, reject the request here: ${opts.link}\n\nOtherwise your vault will be released to your trusted contacts on ${date}.`,
+  };
+}
+
+/** Sent to the contact whose request the owner rejected. */
+export function claimRejectedEmail(opts: { to: string; recipientName: string; ownerName: string }): Email {
+  return {
+    to: opts.to,
+    subject: `${opts.ownerName} responded to your request`,
+    html: layout(
+      p(`Hi ${esc(opts.recipientName)},`) +
+        p(`${esc(opts.ownerName)} confirmed they're OK, so your request for access was cancelled. Nothing has been shared.`) +
+        p(`Your personal link keeps working if you ever need it again.`),
+    ),
+    text: `Hi ${opts.recipientName},\n\n${opts.ownerName} confirmed they're OK, so your request for access was cancelled. Nothing has been shared. Your personal link keeps working if you ever need it again.`,
+  };
+}

@@ -6,6 +6,7 @@ import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { hashToken, newToken } from "./crypto";
 import { LOGIN_TOKEN_MINUTES, SESSION_DAYS } from "./config";
+import { needsAutoCheckIn, recordActivity } from "./switch";
 
 const COOKIE = "le_session";
 const { users, sessions, loginTokens } = schema;
@@ -73,7 +74,10 @@ export async function endSession(): Promise<void> {
   jar.delete(COOKIE);
 }
 
-/** Current user or null. Deduplicated per request. */
+/**
+ * Current user or null. Deduplicated per request.
+ * Any signed-in visit counts as a check-in (at most once an hour; see recordActivity for the rules).
+ */
 export const getCurrentUser = cache(async () => {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
@@ -83,7 +87,9 @@ export const getCurrentUser = cache(async () => {
     .innerJoin(users, eq(sessions.userId, users.id))
     .where(and(eq(sessions.tokenHash, hashToken(token)), gt(sessions.expiresAt, new Date())))
     .limit(1);
-  return rows[0]?.user ?? null;
+  const user = rows[0]?.user ?? null;
+  if (user && needsAutoCheckIn(user)) return recordActivity(user);
+  return user;
 });
 
 export async function requireUser() {

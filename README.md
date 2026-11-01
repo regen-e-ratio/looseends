@@ -11,10 +11,11 @@ A private "dead man's switch" vault. People record their subscriptions, bank acc
 1. **Sign in with email**: passwordless magic links. Signing up and signing in are the same flow.
 2. **Vault**: items of 8 kinds (subscription, bank, investment, crypto wallet, insurance, online account, other, message). Item contents are encrypted with AES-256-GCM before being stored.
 3. **Trusted contacts**: name, email, optional personal message (also encrypted). Each item is shared with *everyone* or *selected contacts*.
-4. **Switch**: every N days (7–180) the user must check in. Signing in, the dashboard button, or the one-click link in the reminder email all count.
-   - When a check-in is overdue, the status becomes `warning` and reminders are sent every 1–3 days for the grace period (3–30 days).
-   - When the grace period ends, the status becomes `triggered`. Each contact gets an email with a personal `/access/<token>` link, and the owner gets a notice.
-   - The owner can sign in and **revoke & reset**, which invalidates all access links.
+4. **Release switch**: the owner picks one of two modes (never both), in Check-in & settings:
+   - **Email check-ins** (`checkin`): every N days (7–180) the owner must check in. Overdue → status `warning` and reminders every 1–3 days for the grace period (3–30 days) → `triggered`: each contact gets an email with a personal `/access/<token>` link, and the owner gets a notice.
+   - **Trusted contacts claim** (`claim`): no scheduled emails. Each contact is emailed a personal `/claim/<token>` link. Requesting access sets status `warning` and emails the owner (with reminders). If the owner doesn't reject within the grace period, the vault is released to all contacts. One claim at a time; rejecting tells the contact.
+   - **Automatic check-in**: any signed-in visit counts (at most once an hour). In check-in mode it resets the timer and stops reminders. In claim mode it never cancels a pending claim (someone could be using the owner's signed-in device); the owner must press "I'm OK — reject".
+   - After a release, the owner can sign in and **revoke & reset**, which invalidates all access links.
 5. A daily Vercel Cron (`vercel.json`) calls `/api/cron/check-switches` (protected by `CRON_SECRET`).
 
 ## Stack

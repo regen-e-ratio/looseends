@@ -7,7 +7,7 @@ import { db, schema } from "@/db";
 import { consumeLoginToken, createLoginToken, endSession, normalizeEmail, startSession } from "@/lib/auth";
 import { appUrl } from "@/lib/config";
 import { loginEmail, sendEmail } from "@/lib/email";
-import { checkIn } from "@/lib/switch";
+import { recordActivity } from "@/lib/switch";
 import { isLandingSlug } from "@/marketing";
 
 export type LoginState = { error?: string; sentTo?: string };
@@ -53,8 +53,8 @@ export async function verifyLoginAction(formData: FormData) {
   const user = await db.query.users.findFirst({ where: eq(schema.users.email, email) });
   if (!user) throw new Error("user upsert failed");
 
-  // Signing in proves you're alive (unless the vault was already released — that needs an explicit reset).
-  if (user.switchStatus !== "triggered") await checkIn(user.id);
+  // Signing in proves you're alive (check-in mode). It never cancels a pending claim or a release.
+  await recordActivity(user);
   await startSession(user.id);
   redirect(user.name ? "/dashboard" : "/welcome");
 }

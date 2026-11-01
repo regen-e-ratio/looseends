@@ -9,7 +9,7 @@ import { Alert, Card, Field, Input, Textarea } from "./ui";
 
 type Initial = { id: string; name: string; email: string; relationship: string | null; personalMessage: string | null };
 
-export function ContactForm({ initial }: { initial?: Initial }) {
+export function ContactForm({ initial, claimMode = false }: { initial?: Initial; claimMode?: boolean }) {
   const [state, action] = useActionState<FormState, FormData>(saveContactAction, {});
   const err = (k: string) => state.fieldErrors?.[k]?.[0];
   return (
@@ -38,7 +38,12 @@ export function ContactForm({ initial }: { initial?: Initial }) {
             placeholder="Anything you want to say just to them…"
           />
         </Field>
-        {!initial && (
+        {!initial && claimMode && (
+          <p className="rounded-lg bg-teal-50 p-3 text-sm text-teal-900">
+            We&apos;ll email them their personal link to request access if something happens to you. Nothing from your vault is included.
+          </p>
+        )}
+        {!initial && !claimMode && (
           <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" name="notify" defaultChecked className="mt-1 accent-teal-700" />
             <span>

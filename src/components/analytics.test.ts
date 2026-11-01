@@ -3,6 +3,7 @@ import { redactUrl } from "./analytics";
 const B = "https://www.looseends.life";
 const cases: [string, string][] = [
   [`${B}/access/AbC_def-123xyz`, `${B}/access/[token]`],
+  [`${B}/claim/Zz9_secret-token`, `${B}/claim/[token]`],
   [`${B}/check-in?u=8b1f0e3e-1111-4222-8333-944445555666&t=secret`, `${B}/check-in`],
   [`${B}/auth/verify?token=secret`, `${B}/auth/verify`],
   [`${B}/items/8b1f0e3e-1111-4222-8333-944445555666`, `${B}/items/[id]`],
