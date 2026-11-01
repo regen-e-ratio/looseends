@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { saveItemAction, type FormState } from "@/app/actions/vault";
-import { ITEM_KINDS, kindFields, type ItemKind } from "@/lib/items";
+import { ITEM_KINDS, kindFields, kindWarning, type ItemKind } from "@/lib/items";
 import { SubmitButton } from "./submit-button";
 import { Alert, Card, Field, Input, Textarea } from "./ui";
 
@@ -38,10 +38,10 @@ export function ItemForm({ kind, contacts, initial = {} }: { kind: ItemKind; con
             </Field>
           );
         })}
-        {kind !== "message" && (
-          <p className="text-xs text-stone-500">
-            🔒 Encrypted before it&apos;s stored. Still, never write passwords or full card numbers — say <em>where</em> to find
-            them instead (e.g. &ldquo;in my password manager&rdquo;).
+        {kindWarning(kind) && (
+          <p className={kind === "crypto" ? "rounded-lg bg-amber-50 p-3 text-sm text-amber-900" : "text-xs text-stone-500"}>
+            {kind === "crypto" ? "⚠️ " : "🔒 "}
+            {kindWarning(kind)}
           </p>
         )}
       </Card>

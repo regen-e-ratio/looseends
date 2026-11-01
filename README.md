@@ -4,12 +4,12 @@
 
 A private "dead man's switch" vault. People record their subscriptions, bank accounts, investments, insurance, online accounts and personal messages, and choose trusted contacts. If they stop answering periodic check-in emails, each contact receives a private link to exactly what was shared with them.
 
-**Deploying for the first time? → see [SETUP.md](./SETUP.md).**
+**Deploying for the first time? → see [SETUP.md](./SETUP.md).** · **Landing pages & ads → see [MARKETING.md](./MARKETING.md).**
 
 ## How it works
 
 1. **Sign in with email**: passwordless magic links. Signing up and signing in are the same flow.
-2. **Vault**: items of 7 kinds (subscription, bank, investment, insurance, online account, other, message). Item contents are encrypted with AES-256-GCM before being stored.
+2. **Vault**: items of 8 kinds (subscription, bank, investment, crypto wallet, insurance, online account, other, message). Item contents are encrypted with AES-256-GCM before being stored.
 3. **Trusted contacts**: name, email, optional personal message (also encrypted). Each item is shared with *everyone* or *selected contacts*.
 4. **Switch**: every N days (7–180) the user must check in. Signing in, the dashboard button, or the one-click link in the reminder email all count.
    - When a check-in is overdue, the status becomes `warning` and reminders are sent every 1–3 days for the grace period (3–30 days).
@@ -29,7 +29,9 @@ A private "dead man's switch" vault. People record their subscriptions, bank acc
 ```
 src/
   app/
-    page.tsx                     landing
+    page.tsx                     homepage (marketing template, "home" config)
+    for/[slug]/                  campaign landing pages (static), for/ = internal index
+    robots.ts, sitemap.ts        only / and /for/* are indexable
     login/, auth/verify/         magic-link sign-in (GET shows a button; POST consumes the token, so email scanners can't burn it)
     welcome/                     asks new users for their name
     (app)/dashboard|items|contacts|settings|preview   signed-in area
@@ -41,6 +43,8 @@ src/
   lib/
     switch.ts                    dead man's switch state machine (evaluateSwitch is pure)
     auth.ts  crypto.ts  email.ts  vault.ts  items.ts  config.ts
+  marketing/                     landing page copy: one config per audience in pages/, registry in index.ts
+  components/marketing/          landing page template
   db/schema.ts                   Drizzle schema
 drizzle/                         SQL migrations (applied automatically by `npm run build`)
 e2e/full-flow.mjs                end-to-end test of the whole lifecycle

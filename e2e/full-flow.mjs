@@ -43,10 +43,26 @@ page.on("pageerror", (e) => console.error("PAGE ERROR", e));
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png`, fullPage: true });
 
 try {
-  step("landing");
+  step("marketing pages, robots and sitemap");
+  for (const slug of ["family", "investors", "crypto"]) {
+    const r = await fetch(`${BASE}/for/${slug}`);
+    assert.equal(r.status, 200, `/for/${slug}`);
+  }
+  assert.equal((await fetch(`${BASE}/for/does-not-exist`)).status, 404);
+  assert.match(await (await fetch(`${BASE}/robots.txt`)).text(), /Disallow: \//);
+  assert.match(await (await fetch(`${BASE}/sitemap.xml`)).text(), /\/for\/crypto/);
+  assert.equal((await fetch(`${BASE}/for/crypto`)).headers.get("x-robots-tag"), null, "landing pages indexable");
+  assert.match((await fetch(`${BASE}/login`)).headers.get("x-robots-tag") ?? "", /noindex/);
   await page.goto(BASE);
+  await page.getByRole("link", { name: "Create your free vault" }).first().waitFor();
   await shot("01-landing");
-  await page.getByRole("link", { name: "Create your free vault" }).click();
+
+  step("arrive from a crypto ad");
+  await page.goto(`${BASE}/for/crypto?utm_source=e2e&utm_campaign=launch`);
+  await shot("01b-landing-crypto");
+  const cta = page.getByRole("link", { name: "Map my wallets — free" }).first();
+  await page.waitForFunction(() => document.querySelector('a[href*="utm_campaign=launch"]'));
+  await cta.click();
 
   step("request login link");
   await page.getByLabel("Email address").fill(owner);
@@ -62,8 +78,13 @@ try {
   await page.waitForURL("**/welcome");
   await page.getByLabel("Your full name").fill("Joana Example");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.waitForURL("**/dashboard");
-  await shot("03-dashboard-empty");
+  await page.waitForURL("**/items/new?kind=crypto");
+  await page.getByText("Never write your seed phrase").waitFor();
+  await shot("03-start-crypto");
+  const [attr] = await sql`select signup_source, signup_campaign from users where email=${owner}`;
+  assert.equal(attr.signup_source, "crypto");
+  assert.equal(attr.signup_campaign, "utm_source=e2e&utm_campaign=launch");
+  await page.goto(`${BASE}/dashboard`);
 
   step("token is single use");
   const p2 = await browser.newPage();

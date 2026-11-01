@@ -43,6 +43,25 @@ export const ITEM_KINDS = {
       notes: { label: "Notes & instructions", placeholder: "Beneficiary is set to my partner. Where the hardware wallet is kept…" },
     },
   },
+  crypto: {
+    label: "Crypto wallet",
+    plural: "Crypto wallets",
+    icon: "🪙",
+    hint: "Hardware wallets, exchange accounts, software wallets…",
+    warning:
+      "Never write your seed phrase, private keys or PINs here — not even partly. Describe what exists, where the backup is kept and who can help recover it.",
+    fields: {
+      title: { label: "Wallet or exchange", placeholder: "Hardware wallet — cold storage" },
+      provider: { label: "Type & coins", placeholder: "Hardware wallet · BTC and ETH" },
+      reference: { label: "Where the device / backup is kept", placeholder: "Device in the home safe; steel backup at my parents' house" },
+      amount: { label: "Approximate value", placeholder: "≈ $25,000" },
+      contact: { label: "Who can help recover it", placeholder: "My friend Sam (+1 555 0100) knows how to restore it" },
+      notes: {
+        label: "Recovery steps",
+        placeholder: "1. Install the wallet's official app\n2. Use the backup to restore…\nNo passphrase. Beware of anyone offering “recovery help”.",
+      },
+    },
+  },
   insurance: {
     label: "Insurance",
     plural: "Insurance",
@@ -101,6 +120,16 @@ export type ItemKind = keyof typeof ITEM_KINDS;
 export const KIND_ORDER = Object.keys(ITEM_KINDS) as ItemKind[];
 export type FieldName = "title" | "provider" | "reference" | "amount" | "contact" | "notes";
 export const FIELD_ORDER: FieldName[] = ["title", "provider", "reference", "amount", "contact", "notes"];
+
+const DEFAULT_WARNING =
+  "Encrypted before it's stored. Still, never write passwords or full card numbers — say where to find them instead (e.g. “in my password manager”).";
+
+/** Safety note shown under the item form. */
+export function kindWarning(kind: ItemKind): string | null {
+  if (kind === "message") return null;
+  const k = ITEM_KINDS[kind];
+  return "warning" in k ? k.warning : DEFAULT_WARNING;
+}
 
 export function isKind(k: unknown): k is ItemKind {
   return typeof k === "string" && k in ITEM_KINDS;

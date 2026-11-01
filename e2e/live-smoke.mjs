@@ -40,8 +40,19 @@ await check("security headers", async () => {
   assert.equal(r.headers.get("referrer-policy"), "no-referrer");
   assert.equal(r.headers.get("x-frame-options"), "DENY");
   assert.equal(r.headers.get("x-content-type-options"), "nosniff");
-  assert.match(r.headers.get("x-robots-tag") ?? "", /noindex/);
   assert.match(r.headers.get("strict-transport-security") ?? "", /max-age/);
+  for (const p of ["/login", "/access/x", "/check-in"]) assert.match((await get(p)).headers.get("x-robots-tag") ?? "", /noindex/, p);
+});
+
+await check("landing pages are live, indexable and in the sitemap", async () => {
+  const sitemap = await (await get("/sitemap.xml")).text();
+  for (const slug of ["family", "investors", "crypto"]) {
+    const r = await get(`/for/${slug}`);
+    assert.equal(r.status, 200, slug);
+    assert.equal(r.headers.get("x-robots-tag"), null, `${slug} should be indexable`);
+    assert.ok(sitemap.includes(`/for/${slug}`), `${slug} missing from sitemap`);
+  }
+  assert.equal((await get("/for/nope")).status, 404);
 });
 
 await check("cron endpoint rejects missing and wrong secrets", async () => {
@@ -67,6 +78,13 @@ const browser = await chromium.launch();
 const page = await browser.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
+
+await check("ad click on a landing page carries attribution to sign-up", async () => {
+  await page.goto(`${BASE}/for/crypto?utm_source=smoke&utm_campaign=test`);
+  await page.waitForFunction(() => document.querySelector('a[href*="from=crypto"][href*="utm_campaign=test"]'));
+  await page.getByRole("link", { name: "Map my wallets — free" }).first().click();
+  await page.waitForURL(/\/login\?from=crypto/);
+});
 
 await check("landing page shows the Loose Ends brand", async () => {
   await page.goto(BASE);

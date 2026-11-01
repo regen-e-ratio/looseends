@@ -19,7 +19,8 @@ export async function saveNameAction(_prev: FormState, formData: FormData): Prom
   if (!name.success) return { fieldErrors: { name: ["Please enter your name."] } };
   await db.update(users).set({ name: name.data }).where(eq(users.id, user.id));
   const next = String(formData.get("next") ?? "");
-  if (next === "/dashboard") redirect("/dashboard");
+  // Only internal app paths are allowed as a redirect target.
+  if (/^\/(dashboard|items\/new\?kind=[a-z]+)$/.test(next)) redirect(next);
   revalidatePath("/settings");
   return {};
 }

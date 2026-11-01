@@ -16,6 +16,10 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name"),
   createdAt: tz("created_at").notNull().defaultNow(),
+  /** Landing page slug the user signed up from (src/marketing), e.g. "crypto". Null = homepage/direct. */
+  signupSource: text("signup_source"),
+  /** UTM parameters of the ad that brought them, as a query string, e.g. "utm_source=meta&utm_campaign=oct". */
+  signupCampaign: text("signup_campaign"),
 
   // Dead man's switch
   switchEnabled: boolean("switch_enabled").notNull().default(false),
@@ -50,6 +54,9 @@ export const loginTokens = pgTable(
     createdAt: tz("created_at").notNull().defaultNow(),
     expiresAt: tz("expires_at").notNull(),
     usedAt: tz("used_at"),
+    /** Attribution carried from the landing page to account creation (see users.signupSource). */
+    signupSource: text("signup_source"),
+    signupCampaign: text("signup_campaign"),
   },
   (t) => [index("login_tokens_email_idx").on(t.email)],
 );

@@ -5,7 +5,7 @@ import { requestLoginAction, type LoginState } from "@/app/actions/auth";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, Field, Input } from "@/components/ui";
 
-export function LoginForm() {
+export function LoginForm({ attribution = {} }: { attribution?: Record<string, string> }) {
   const [state, action] = useActionState<LoginState, FormData>(requestLoginAction, {});
 
   if (state.sentTo) {
@@ -23,6 +23,9 @@ export function LoginForm() {
 
   return (
     <form action={action} className="space-y-5">
+      {Object.entries(attribution).map(([k, v]) => (
+        <input key={k} type="hidden" name={k} value={v} />
+      ))}
       <div>
         <h1 className="text-xl font-semibold">Sign in or create your vault</h1>
         <p className="mt-1 text-sm text-stone-600">No password needed — we&apos;ll email you a secure sign-in link.</p>

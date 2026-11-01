@@ -14,8 +14,10 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+export type Attribution = { signupSource: string | null; signupCampaign: string | null };
+
 /** Creates a single-use login token. Returns null if this email asked for too many recently. */
-export async function createLoginToken(email: string): Promise<string | null> {
+export async function createLoginToken(email: string, attribution?: Attribution): Promise<string | null> {
   const [{ recent }] = await db
     .select({ recent: sql<number>`count(*)::int` })
     .from(loginTokens)
@@ -27,20 +29,21 @@ export async function createLoginToken(email: string): Promise<string | null> {
     tokenHash: hash,
     email,
     expiresAt: new Date(Date.now() + LOGIN_TOKEN_MINUTES * 60_000),
+    ...attribution,
   });
   return token;
 }
 
-/** Atomically consumes a login token. Returns the email it was issued for, or null. */
-export async function consumeLoginToken(token: string): Promise<string | null> {
+/** Atomically consumes a login token. Returns the email (and attribution) it was issued for, or null. */
+export async function consumeLoginToken(token: string): Promise<({ email: string } & Attribution) | null> {
   const rows = await db
     .update(loginTokens)
     .set({ usedAt: new Date() })
     .where(
       and(eq(loginTokens.tokenHash, hashToken(token)), isNull(loginTokens.usedAt), gt(loginTokens.expiresAt, new Date())),
     )
-    .returning({ email: loginTokens.email });
-  return rows[0]?.email ?? null;
+    .returning({ email: loginTokens.email, signupSource: loginTokens.signupSource, signupCampaign: loginTokens.signupCampaign });
+  return rows[0] ?? null;
 }
 
 export async function peekLoginToken(token: string): Promise<string | null> {

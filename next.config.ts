@@ -5,7 +5,6 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "no-referrer" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Robots-Tag", value: "noindex, nofollow" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
@@ -19,7 +18,14 @@ const nextConfig: NextConfig = {
     },
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    // Marketing pages (/ and /for/*) may be indexed; everything else — and especially the token links — never.
+    const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      ...["/access/:path*", "/check-in", "/auth/:path*", "/api/:path*", "/login", "/welcome", "/dashboard", "/items/:path*", "/contacts/:path*", "/settings", "/preview/:path*"].map(
+        (source) => ({ source, headers: noindex }),
+      ),
+    ];
   },
 };
 
