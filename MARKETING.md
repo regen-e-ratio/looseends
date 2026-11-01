@@ -36,6 +36,15 @@ https://www.looseends.life/for/crypto?utm_source=meta&utm_medium=paid&utm_campai
 
 The sign-up button carries the page slug and the `utm_*` values through sign-up. On account creation they're stored in `users.signup_source` (for example `crypto`) and `users.signup_campaign` (for example `utm_source=meta&utm_campaign=crypto-nov`). Existing users who sign in again are never re-attributed.
 
+## Traffic: Vercel Web Analytics
+Vercel → project → **Analytics** shows visitors and page views per page, referrers and countries. It's cookieless, so no cookie banner is needed.
+
+- **Visits per landing page:** filter by path `/for/crypto`, etc.
+- **Button clicks:** page views of `/login?from=crypto` mean someone clicked the sign-up button on that page.
+- **Completed signups:** page views of `/welcome`, or exact numbers per page/campaign with the SQL below.
+
+Before anything is sent, URLs are cleaned in `src/components/analytics.tsx`: access-link and sign-in tokens, record IDs and all query parameters except `from` and `utm_*` are removed. If you add a route whose URL contains anything private, add it there and to `src/components/analytics.test.ts` (`npm run test:unit`).
+
 ## See which pages convert
 In the Neon console (Vercel → Storage → your database → **Open in Neon** → SQL Editor):
 

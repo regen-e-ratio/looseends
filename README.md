@@ -22,7 +22,7 @@ A private "dead man's switch" vault. People record their subscriptions, bank acc
 - **Next.js 16** (App Router, Server Actions), React 19, Tailwind CSS 4
 - **Postgres** via Drizzle ORM + `postgres` driver (Neon in production)
 - **Email**: Resend HTTP API, or any SMTP server (nodemailer). Without a provider, emails are printed to the server log, for development.
-- Hosting and cron on **Vercel**
+- Hosting, cron and cookieless Web Analytics on **Vercel** (URLs are redacted before sending — see `src/components/analytics.tsx`)
 
 ## Code map
 

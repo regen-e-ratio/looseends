@@ -68,6 +68,11 @@ await check("private pages redirect anonymous visitors to /login", async () => {
   }
 });
 
+await check("Vercel Web Analytics is enabled for the project", async () => {
+  const r = await get("/_vercel/insights/script.js");
+  assert.equal(r.status, 200, "enable it in Vercel → project → Analytics");
+});
+
 await check("favicon is served", async () => {
   const r = await get("/icon.svg");
   assert.equal(r.status, 200);
