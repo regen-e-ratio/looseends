@@ -3,7 +3,6 @@ import type { NextConfig } from "next";
 const securityHeaders = [
   // Access and check-in links carry secret tokens in the URL, so never leak them via Referer.
   { key: "Referrer-Policy", value: "no-referrer" },
-  { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
@@ -22,6 +21,9 @@ const nextConfig: NextConfig = {
     const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
     return [
       { source: "/:path*", headers: securityHeaders },
+      // Nothing may be framed — except the ad pages, by our own /for gallery.
+      { source: "/((?!for(?:/|$)).*)", headers: [{ key: "X-Frame-Options", value: "DENY" }] },
+      { source: "/for/:path*", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
       ...["/access/:path*", "/check-in", "/auth/:path*", "/api/:path*", "/login", "/welcome", "/dashboard", "/items/:path*", "/contacts/:path*", "/settings", "/preview/:path*"].map(
         (source) => ({ source, headers: noindex }),
       ),

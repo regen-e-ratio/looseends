@@ -44,14 +44,16 @@ await check("security headers", async () => {
   for (const p of ["/login", "/access/x", "/check-in"]) assert.match((await get(p)).headers.get("x-robots-tag") ?? "", /noindex/, p);
 });
 
-await check("landing pages are live, indexable and in the sitemap", async () => {
+await check("ad pages and their alternatives are live; defaults indexable and in the sitemap", async () => {
   const sitemap = await (await get("/sitemap.xml")).text();
   for (const slug of ["family", "investors", "crypto"]) {
     const r = await get(`/for/${slug}`);
     assert.equal(r.status, 200, slug);
     assert.equal(r.headers.get("x-robots-tag"), null, `${slug} should be indexable`);
     assert.ok(sitemap.includes(`/for/${slug}`), `${slug} missing from sitemap`);
+    for (const v of ["a", "b", "c"]) assert.equal((await get(`/for/${slug}/${v}`)).status, 200, `${slug}/${v}`);
   }
+  assert.equal((await get("/for")).status, 200, "gallery");
   assert.equal((await get("/for/nope")).status, 404);
 });
 
@@ -84,10 +86,13 @@ const page = await browser.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 
-await check("ad click on a landing page carries attribution to sign-up", async () => {
+await check("ad click → homepage → sign-up keeps attribution", async () => {
   await page.goto(`${BASE}/for/crypto?utm_source=smoke&utm_campaign=test`);
-  await page.waitForFunction(() => document.querySelector('a[href*="from=crypto"][href*="utm_campaign=test"]'));
-  await page.getByRole("link", { name: "Map my wallets — free" }).first().click();
+  await page.waitForFunction(() => document.querySelector('main a[href*="from=crypto"][href*="utm_campaign=test"]'));
+  await page.locator("main a[href^='/?']").first().click();
+  await page.waitForURL(/\/\?from=crypto/);
+  await page.waitForFunction(() => document.querySelector('a[href^="/login?from=crypto"][href*="utm_campaign=test"]'));
+  await page.getByRole("link", { name: "Create your free vault" }).first().click();
   await page.waitForURL(/\/login\?from=crypto/);
 });
 

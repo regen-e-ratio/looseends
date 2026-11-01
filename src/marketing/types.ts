@@ -1,7 +1,6 @@
 /**
- * A marketing landing page. Each audience/ad campaign gets one config file in ./pages,
- * registered in ./index.ts, and is served statically at /for/<slug>.
- * All copy lives here; the layout lives in src/components/marketing/landing-template.tsx.
+ * The long-form homepage ("the normal landing page"). Its copy lives in ./pages/home.ts and the layout
+ * in src/components/marketing/landing-template.tsx. Single-screen ads per audience live in ./ads.
  */
 export type LandingPage = {
   /** URL segment: /for/<slug>. Lowercase letters, digits and dashes. The home page uses "". */

@@ -38,7 +38,7 @@ export function LandingTemplate({ page, signedIn = false }: { page: LandingPage;
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-stone-600">{page.hero.subheadline}</p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               {signedIn ? (
-                <CtaLink href="/dashboard" className={primary}>
+                <CtaLink href="/dashboard" forward={false} className={primary}>
                   Go to my vault
                 </CtaLink>
               ) : (
@@ -134,6 +134,7 @@ export function LandingTemplate({ page, signedIn = false }: { page: LandingPage;
               <CtaLink
                 from={from}
                 href={signedIn ? "/dashboard" : "/login"}
+                forward={!signedIn}
                 className="bg-white text-teal-900 hover:bg-teal-50 focus-visible:ring-white focus-visible:ring-offset-teal-800"
               >
                 {signedIn ? "Go to my vault" : page.closing.cta}

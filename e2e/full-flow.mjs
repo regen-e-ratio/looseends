@@ -45,24 +45,31 @@ const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png`, fullPage: true 
 try {
   step("marketing pages, robots and sitemap");
   for (const slug of ["family", "investors", "crypto"]) {
-    const r = await fetch(`${BASE}/for/${slug}`);
-    assert.equal(r.status, 200, `/for/${slug}`);
+    for (const path of [`/for/${slug}`, `/for/${slug}/a`, `/for/${slug}/b`, `/for/${slug}/c`]) {
+      assert.equal((await fetch(`${BASE}${path}`)).status, 200, path);
+    }
   }
   assert.equal((await fetch(`${BASE}/for/does-not-exist`)).status, 404);
+  assert.equal((await fetch(`${BASE}/for/crypto/zz`)).status, 404);
+  assert.match(await (await fetch(`${BASE}/for/crypto/b`)).text(), /<meta name="robots" content="noindex/, "alternatives not indexed");
+  assert.doesNotMatch(await (await fetch(`${BASE}/for/crypto`)).text(), /<meta name="robots" content="noindex/, "default indexed");
   assert.match(await (await fetch(`${BASE}/robots.txt`)).text(), /Disallow: \//);
   assert.match(await (await fetch(`${BASE}/sitemap.xml`)).text(), /\/for\/crypto/);
-  assert.equal((await fetch(`${BASE}/for/crypto`)).headers.get("x-robots-tag"), null, "landing pages indexable");
+  assert.equal((await fetch(`${BASE}/for/crypto`)).headers.get("x-robots-tag"), null, "ad pages indexable");
   assert.match((await fetch(`${BASE}/login`)).headers.get("x-robots-tag") ?? "", /noindex/);
   await page.goto(BASE);
   await page.getByRole("link", { name: "Create your free vault" }).first().waitFor();
   await shot("01-landing");
 
-  step("arrive from a crypto ad");
+  step("arrive from a crypto ad → homepage → sign up");
   await page.goto(`${BASE}/for/crypto?utm_source=e2e&utm_campaign=launch`);
-  await shot("01b-landing-crypto");
-  const cta = page.getByRole("link", { name: "Map my wallets — free" }).first();
-  await page.waitForFunction(() => document.querySelector('a[href*="utm_campaign=launch"]'));
-  await cta.click();
+  await shot("01b-ad-crypto");
+  await page.waitForFunction(() => document.querySelector('main a[href*="from=crypto"][href*="utm_campaign=launch"]'));
+  await page.locator("main a[href^='/?']").first().click();
+  await page.waitForURL(/\/\?from=crypto&utm_source=e2e&utm_campaign=launch$/);
+  await page.waitForFunction(() => document.querySelector('a[href^="/login?from=crypto"][href*="utm_campaign=launch"]'));
+  await page.getByRole("link", { name: "Create your free vault" }).first().click();
+  await page.waitForURL(/\/login\?from=crypto/);
 
   step("request login link");
   await page.getByLabel("Email address").fill(owner);

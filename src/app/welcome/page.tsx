@@ -1,14 +1,14 @@
 import { AuthShell } from "@/components/auth-shell";
 import { requireUser } from "@/lib/auth";
 import { NameForm } from "@/components/name-form";
-import { getLandingPage } from "@/marketing";
+import { getAudience } from "@/marketing";
 
 export const metadata = { title: "Welcome" };
 
 export default async function WelcomePage() {
   const user = await requireUser();
   // New users from a campaign page start where that page promised (e.g. writing a letter).
-  const next = (user.signupSource && getLandingPage(user.signupSource)?.startHref) || "/dashboard";
+  const next = (user.signupSource && getAudience(user.signupSource)?.startHref) || "/dashboard";
   return (
     <AuthShell>
       <h1 className="text-xl font-semibold">Welcome! What&apos;s your name?</h1>

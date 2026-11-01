@@ -29,8 +29,8 @@ A private "dead man's switch" vault. People record their subscriptions, bank acc
 ```
 src/
   app/
-    page.tsx                     homepage (marketing template, "home" config)
-    for/[slug]/                  campaign landing pages (static), for/ = internal index
+    page.tsx                     homepage, the full pitch (marketing template, "home" config)
+    for/[slug]/[variant]/        single-screen ad pages per audience (static); for/ = design gallery
     robots.ts, sitemap.ts        only / and /for/* are indexable
     login/, auth/verify/         magic-link sign-in (GET shows a button; POST consumes the token, so email scanners can't burn it)
     welcome/                     asks new users for their name
@@ -43,8 +43,9 @@ src/
   lib/
     switch.ts                    dead man's switch state machine (evaluateSwitch is pure)
     auth.ts  crypto.ts  email.ts  vault.ts  items.ts  config.ts
-  marketing/                     landing page copy: one config per audience in pages/, registry in index.ts
-  components/marketing/          landing page template
+  marketing/ads/                 one component per ad design + registry of audiences (index.ts)
+  marketing/pages/home.ts        homepage copy
+  components/marketing/          homepage template, CTA link that carries attribution
   db/schema.ts                   Drizzle schema
 drizzle/                         SQL migrations (applied automatically by `npm run build`)
 e2e/full-flow.mjs                end-to-end test of the whole lifecycle
@@ -69,6 +70,11 @@ Runs the full lifecycle (sign-up → items → contacts → per-contact sharing 
 npm run build && npm start > /tmp/server.log 2>&1 &
 set -a; . ./.env.local; set +a
 SERVER_LOG=/tmp/server.log node e2e/full-flow.mjs     # needs Playwright installed globally (NODE_PATH)
+```
+
+### Ad pages fit on one screen
+```bash
+node e2e/ads-fit.mjs   # every ad design × 8 screen sizes: no scrolling, button visible
 ```
 
 ### Live smoke test
