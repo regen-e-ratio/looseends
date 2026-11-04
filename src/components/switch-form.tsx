@@ -153,7 +153,7 @@ export function SwitchForm({
   );
 }
 
-function ModeCard({ value, current, onSelect, title, body }: { value: Mode; current: Mode; onSelect: (m: Mode) => void; title: string; body: string }) {
+export function ModeCard({ value, current, onSelect, title, body }: { value: Mode; current: Mode | null; onSelect: (m: Mode) => void; title: string; body: string }) {
   const selected = value === current;
   return (
     <label

@@ -20,6 +20,8 @@ export const users = pgTable("users", {
   signupSource: text("signup_source"),
   /** UTM parameters of the ad that brought them, as a query string, e.g. "utm_source=meta&utm_campaign=oct". */
   signupCampaign: text("signup_campaign"),
+  /** Set when the user finishes (or skips) the first-time setup at /onboarding. Null = show onboarding. */
+  onboardedAt: tz("onboarded_at"),
 
   // Dead man's switch
   switchEnabled: boolean("switch_enabled").notNull().default(false),

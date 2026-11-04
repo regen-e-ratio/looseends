@@ -23,8 +23,6 @@ export type Audience = {
   name: string;
   /** Who it's for and what the message leads with. Internal only. */
   audience: string;
-  /** Where a new user from this audience starts after sign-up. */
-  startHref: string;
   /** Variant served at /for/<slug>. */
   defaultVariant: string;
   variants: AdVariant[];

@@ -1,10 +1,13 @@
 import { logoutAction } from "@/app/actions/auth";
 import { Logo } from "@/components/logo";
 import { NavLinks } from "@/components/nav-links";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
+  // First-time users go through the guided setup before anything else.
+  if (!user.onboardedAt) redirect("/onboarding");
   return (
     <div className="flex flex-1 flex-col">
       <header className="no-print border-b border-stone-200 bg-white">

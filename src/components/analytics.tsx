@@ -8,7 +8,7 @@ const UUID = /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?=\
 /**
  * Removes anything secret or personal from a URL before it is sent to analytics:
  * access-link and claim-link tokens, check-in / sign-in tokens and record ids. Keeps landing-page
- * attribution (from, utm_*) so the funnel /for/<slug> → /login?from=<slug> → /welcome is visible.
+ * attribution (from, utm_*) so the funnel /for/<slug> → /login?from=<slug> → /onboarding is visible.
  */
 export function redactUrl(raw: string): string {
   const url = new URL(raw);

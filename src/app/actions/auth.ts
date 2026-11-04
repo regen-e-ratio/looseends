@@ -56,7 +56,7 @@ export async function verifyLoginAction(formData: FormData) {
   // Signing in proves you're alive (check-in mode). It never cancels a pending claim or a release.
   await recordActivity(user);
   await startSession(user.id);
-  redirect(user.name ? "/dashboard" : "/welcome");
+  redirect(user.onboardedAt ? "/dashboard" : "/onboarding");
 }
 
 export async function logoutAction() {

@@ -3,7 +3,7 @@
 Each ad audience gets a **single-screen ad page**: one full-screen poster with no scrolling, styled for that audience. Its only button leads to the normal homepage (`/`), which explains the product in full and has the sign-up button.
 
 ```
-ad (Meta/Google/…)  →  /for/<audience>  →  /  (homepage, full pitch)  →  /login  →  /welcome  →  audience's first step
+ad (Meta/Google/…)  →  /for/<audience>  →  /  (homepage, full pitch)  →  /login  →  /onboarding (with audience suggestions)
                        one screen, one button        attribution (from + utm_*) is carried through every step
 ```
 
@@ -18,14 +18,14 @@ The gallery shows every design alternative live, at desktop and phone size, with
 
 - `/for/<audience>` shows the **default** design (`defaultVariant` in `src/marketing/ads/index.ts`). To pick a winner, change that one letter.
 - Only `/for/<audience>` is indexed by search engines. The alternative URLs are `noindex`, so they can also be used for A/B tests: point two ads at `/for/crypto/a` and `/for/crypto/c` with different `utm_content`.
-- New users from an ad start at their audience's first step (`startHref`), for example "write a letter" for family.
+- New users from an ad get audience-specific one-tap suggestions in onboarding, for example brokerage accounts for investors and wallets for crypto (`src/lib/onboarding.ts`).
 
 ## Add a design alternative or a new audience
 1. Copy one of `src/marketing/ads/<audience>-<x>.tsx` (for example `crypto-c.tsx`) to a new file. Each file is the whole ad: copy, colours, fonts and visual.
 2. Build it inside `<AdFrame>` (logo bar, centred content, footer) and use `<AdCta from={from}>` for the button, so attribution keeps working.
    - Use `fitHeadline` for the headline and `visualWhenRoom` on the visual, so it fits on one screen on short phones.
    - Fonts per audience live in `fonts.ts`: Fraunces/Caveat (family), Space Grotesk (investors), JetBrains Mono (crypto).
-3. Register it in `src/marketing/ads/index.ts`: add it to an audience's `variants`, or add a new audience with `slug`, `startHref` and `defaultVariant`.
+3. Register it in `src/marketing/ads/index.ts`: add it to an audience's `variants`, or add a new audience with `slug` and `defaultVariant` (and optionally its onboarding suggestions in `src/lib/onboarding.ts`).
 4. Check it fits on one screen at 8 phone, tablet and desktop sizes:
    ```bash
    npm run build && npm start &
@@ -43,7 +43,7 @@ Vercel → project → **Analytics** (cookieless). Funnel per audience:
 1. Views of `/for/crypto`: people who arrived from the ad.
 2. Views of `/?from=crypto`: people who clicked the ad's button.
 3. Views of `/login?from=crypto`: people who clicked "Create your free vault" on the homepage.
-4. Views of `/welcome`: completed signups. For exact numbers per audience and campaign, use the SQL below.
+4. Views of `/onboarding`: completed signups. For exact numbers per audience and campaign, use the SQL below.
 
 URLs are cleaned in `src/components/analytics.tsx` before sending: tokens, record IDs and all query parameters except `from` and `utm_*` are removed. If you add a route whose URL contains anything private, add it there and to `src/components/analytics.test.ts` (`npm run test:unit`).
 

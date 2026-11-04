@@ -9,6 +9,7 @@ A private "dead man's switch" vault. People record their subscriptions, bank acc
 ## How it works
 
 1. **Sign in with email**: passwordless magic links. Signing up and signing in are the same flow.
+   New users then go through **onboarding** (`/onboarding`), until they finish or skip it (`users.onboarded_at`). It has 3 phases: (1) name, a message and one-tap subscriptions, plus audience-specific suggestions for people who arrived from an ad (`src/lib/onboarding.ts`); (2) trusted contacts, with no emails sent yet; (3) choose email check-ins or contacts claim, which switches it on and sends the matching emails. Progress is derived from saved data, so a reload resumes at the right phase.
 2. **Vault**: items of 8 kinds (subscription, bank, investment, crypto wallet, insurance, online account, other, message). Item contents are encrypted with AES-256-GCM before being stored.
 3. **Trusted contacts**: name, email, optional personal message (also encrypted). Each item is shared with *everyone* or *selected contacts*.
 4. **Release switch**: the owner picks one of two modes (never both), in Check-in & settings:
@@ -34,7 +35,7 @@ src/
     for/[slug]/[variant]/        single-screen ad pages per audience (static); for/ = design gallery
     robots.ts, sitemap.ts        only / and /for/* are indexable
     login/, auth/verify/         magic-link sign-in (GET shows a button; POST consumes the token, so email scanners can't burn it)
-    welcome/                     asks new users for their name
+    onboarding/                  first-time setup in 3 phases (vault, people, release mode)
     (app)/dashboard|items|contacts|settings|preview   signed-in area
     check-in/                    one-click "I'm OK" from reminder emails
     access/[token]/              what a contact sees after release

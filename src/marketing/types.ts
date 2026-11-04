@@ -8,8 +8,6 @@ export type LandingPage = {
   /** Internal note: who this page targets and where its traffic comes from. Never shown. */
   audience: string;
   meta: { title: string; description: string };
-  /** Where a new user who signed up from this page lands after entering their name. */
-  startHref: string;
 
   hero: {
     eyebrow: string;

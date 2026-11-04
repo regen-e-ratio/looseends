@@ -8,7 +8,6 @@ export const home: LandingPage = {
     description:
       "Write down your accounts, subscriptions and last wishes, and make sure they reach the right people if something happens to you.",
   },
-  startHref: "/dashboard",
   hero: {
     eyebrow: "Tie up your loose ends",
     headline: "So the people you love aren't left untangling them.",

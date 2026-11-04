@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
       // Nothing may be framed — except the ad pages, by our own /for gallery.
       { source: "/((?!for(?:/|$)).*)", headers: [{ key: "X-Frame-Options", value: "DENY" }] },
       { source: "/for/:path*", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
-      ...["/access/:path*", "/claim/:path*", "/check-in", "/auth/:path*", "/api/:path*", "/login", "/welcome", "/dashboard", "/items/:path*", "/contacts/:path*", "/settings", "/preview/:path*"].map(
+      ...["/access/:path*", "/claim/:path*", "/check-in", "/auth/:path*", "/api/:path*", "/login", "/onboarding", "/dashboard", "/items/:path*", "/contacts/:path*", "/settings", "/preview/:path*"].map(
         (source) => ({ source, headers: noindex }),
       ),
     ];

@@ -82,16 +82,56 @@ try {
   await page.goto(loginLink);
   await page.goto(loginLink); // simulate scanner prefetch + real click
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.waitForURL("**/welcome");
-  await page.getByLabel("Your full name").fill("Joana Example");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.waitForURL("**/items/new?kind=crypto");
-  await page.getByText("Never write your seed phrase").waitFor();
-  await shot("03-start-crypto");
+  await page.waitForURL("**/onboarding");
   const [attr] = await sql`select signup_source, signup_campaign from users where email=${owner}`;
   assert.equal(attr.signup_source, "crypto");
   assert.equal(attr.signup_campaign, "utm_source=e2e&utm_campaign=launch");
+
+  step("onboarding is required for new users; crypto ad → wallet suggestions");
   await page.goto(`${BASE}/dashboard`);
+  await page.waitForURL("**/onboarding");
+  await page.getByRole("button", { name: "+ Hardware wallet" }).waitFor();
+  await shot("03-onboarding-1");
+
+  step("onboarding phase 1: name, a message, a subscription");
+  await page.getByLabel("Your name").fill("Joana Example");
+  await page.getByLabel("Message", { exact: true }).fill("I love you all. Don't fight over the record collection.");
+  await page.getByRole("button", { name: "+ Netflix" }).click();
+  await page.getByLabel("Netflix cost").fill("€15.99 / month");
+  await page.getByRole("region", { name: "Write it down" }).getByRole("button", { name: "Continue" }).click();
+  await page.getByText("2 items saved to your vault").waitFor();
+  await page.getByLabel("Person 1 name").waitFor();
+  await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Person 1 name");
+  await shot("03-onboarding-2");
+
+  step("reload resumes at phase 2");
+  await page.reload();
+  await page.getByText("2 items saved to your vault").waitFor();
+  assert.equal(await page.locator('[aria-current="step"]').innerText().then((t) => t.includes("Your people")), true);
+
+  step("onboarding phase 2: add people");
+  await page.getByLabel("Person 1 name").fill("Anna Example");
+  await page.getByLabel("Person 1 email").fill(anna);
+  await page.getByLabel("Person 1 relationship").fill("Sister");
+  await page.getByRole("button", { name: "+ Add another person" }).click();
+  await page.getByLabel("Person 2 name").fill("Bob Example");
+  await page.getByLabel("Person 2 email").fill(bob);
+  await page.getByRole("region", { name: "Your people" }).getByRole("button", { name: "Continue" }).click();
+  await page.getByText("Added Anna Example, Bob Example").waitFor();
+  assert.equal(emailsTo(anna), 0, "nobody is emailed before the mode is chosen");
+  await shot("03-onboarding-3");
+
+  step("onboarding phase 3: choose email check-ins and finish");
+  assert.ok(await page.getByRole("button", { name: "Finish setup" }).isDisabled(), "a choice is required");
+  await page.getByRole("radio", { name: /Email check-ins/ }).check();
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await page.waitForURL("**/dashboard?welcome=1");
+  await page.getByText("You're all set").waitFor();
+  await page.getByText("Your switch is active").waitFor();
+  assert.equal(emailsTo(anna), 1, "anna gets 'you were added' email");
+  await shot("03-dashboard-after-onboarding");
+  await page.goto(`${BASE}/onboarding`);
+  await page.waitForURL("**/dashboard");
 
   step("token is single use");
   const p2 = await browser.newPage();
@@ -106,9 +146,7 @@ try {
     await page.getByRole("button", { name: /^Add / }).click();
     await page.waitForURL("**/dashboard?saved=1*");
   }
-  await addItem("subscription", { Service: "Netflix", Cost: "€15.99 / month", "What should happen": "Cancel it please" });
   await addItem("bank", { Bank: "ING", "Approximate balance": "≈ €10,000", "Notes & instructions": "Bereavement team" });
-  await addItem("message", { Subject: "To my family", Message: "I love you all. Don't fight over the record collection." });
 
   step("validation error on empty title");
   await page.goto(`${BASE}/items/new?kind=investment`);
@@ -116,16 +154,12 @@ try {
   await page.getByRole("button", { name: /^Add / }).click();
   await page.getByText("Please give it a name").waitFor();
 
-  step("add contacts");
-  for (const [name, email, msg] of [["Anna Example", anna, "Anna, you were the best sister."], ["Bob Example", bob, ""]]) {
-    await page.goto(`${BASE}/contacts/new`);
-    await page.getByLabel("Name", { exact: true }).fill(name);
-    await page.getByLabel("Email", { exact: true }).fill(email);
-    if (msg) await page.getByLabel("Personal message").fill(msg);
-    await page.getByRole("button", { name: "Add contact" }).click();
-    await page.waitForURL("**/contacts?saved=1");
-  }
-  assert.equal(emailsTo(anna), 1, "anna gets 'you were added' email");
+  step("give Anna a personal message");
+  const [{ id: annaId }] = await sql`select id from recipients where email=${anna}`;
+  await page.goto(`${BASE}/contacts/${annaId}`);
+  await page.getByLabel("Personal message").fill("Anna, you were the best sister.");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await page.waitForURL("**/contacts?saved=1");
   await shot("04-contacts");
 
   step("share bank only with Bob");
@@ -144,8 +178,7 @@ try {
   for (const r of rows) assert.ok(r.payload.startsWith("v2.") && !r.payload.includes("Netflix"));
 
   step("preview as Anna (no bank)");
-  await page.goto(`${BASE}/contacts`);
-  await page.getByRole("link", { name: "Preview what they'll see" }).first().click();
+  await page.goto(`${BASE}/preview/${annaId}`);
   await page.getByText("Anna, you were the best sister.").waitFor();
   assert.equal(await page.getByText("ING", { exact: true }).count(), 0);
   await page.getByText("Netflix").waitFor();
@@ -153,7 +186,7 @@ try {
 
   step("enable switch");
   await page.goto(`${BASE}/settings`);
-  await page.getByLabel(/Switch is off/).check();
+  assert.ok(await page.getByLabel(/Switch is on/).isChecked(), "onboarding turned the switch on");
   await page.getByLabel("Ask me to check in every").selectOption("7");
   await page.getByLabel("If I don't respond, release after").selectOption("3");
   await page.getByRole("button", { name: "Save switch settings" }).click();

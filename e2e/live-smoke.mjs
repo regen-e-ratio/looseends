@@ -63,7 +63,7 @@ await check("cron endpoint rejects missing and wrong secrets", async () => {
 });
 
 await check("private pages redirect anonymous visitors to /login", async () => {
-  for (const p of ["/dashboard", "/contacts", "/contacts/new", "/settings", "/items/new", "/welcome"]) {
+  for (const p of ["/dashboard", "/contacts", "/contacts/new", "/settings", "/items/new", "/onboarding"]) {
     const r = await get(p);
     assert.ok([302, 303, 307].includes(r.status), `${p} → ${r.status}`);
     assert.match(r.headers.get("location") ?? "", /\/login$/, p);
