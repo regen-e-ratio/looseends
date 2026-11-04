@@ -45,10 +45,7 @@ export default async function ContactsPage({ searchParams }: PageProps<"/contact
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="truncate font-semibold">{c.name}</h2>
-                    <p className="truncate text-sm text-stone-500">
-                      {c.email}
-                      {c.relationship && ` · ${c.relationship}`}
-                    </p>
+                    <p className="truncate text-sm text-stone-500">{c.email}</p>
                   </div>
                   {c.releasedAt ? (
                     <Badge tone="red">Released</Badge>

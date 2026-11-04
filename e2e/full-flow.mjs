@@ -169,6 +169,7 @@ try {
   step("give Anna a personal message");
   const [{ id: annaId }] = await sql`select id from recipients where email=${anna}`;
   await page.goto(`${BASE}/contacts/${annaId}`);
+  assert.equal(await page.getByLabel(/Relationship/).count(), 0, "no relationship field on the contact form");
   await page.getByLabel("Personal message").fill("Anna, you were the best sister.");
   await page.getByRole("button", { name: "Save changes" }).click();
   await page.waitForURL("**/contacts?saved=1");

@@ -79,6 +79,7 @@ export const recipients = pgTable(
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     email: text("email").notNull(),
+    /** No longer shown or edited anywhere; kept so existing values aren't destroyed. */
     relationship: text("relationship"),
     /** encrypted */
     personalMessage: text("personal_message"),

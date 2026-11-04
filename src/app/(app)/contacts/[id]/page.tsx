@@ -34,7 +34,7 @@ export default async function EditContactPage({ params }: PageProps<"/contacts/[
           </form>
         }
       />
-      <ContactForm initial={{ id: c.id, name: c.name, email: c.email, relationship: c.relationship, personalMessage: c.personalMessage }} />
+      <ContactForm initial={{ id: c.id, name: c.name, email: c.email, personalMessage: c.personalMessage }} />
     </div>
   );
 }

@@ -30,7 +30,7 @@ export default async function NewItemPage({ searchParams }: PageProps<"/items/ne
           </Link>
         ))}
       </div>
-      <ItemForm key={kind} kind={kind} contacts={contacts.map(({ id, name, relationship }) => ({ id, name, relationship }))} />
+      <ItemForm key={kind} kind={kind} contacts={contacts.map(({ id, name }) => ({ id, name }))} />
     </div>
   );
 }

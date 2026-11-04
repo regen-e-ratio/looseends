@@ -32,7 +32,7 @@ export default async function EditItemPage({ params }: PageProps<"/items/[id]">)
       />
       <ItemForm
         kind={item.kind}
-        contacts={contacts.map(({ id, name, relationship }) => ({ id, name, relationship }))}
+        contacts={contacts.map(({ id, name }) => ({ id, name }))}
         initial={{
           id: item.id,
           values: { title: item.title, provider: item.provider, reference: item.reference, amount: item.amount, contact: item.contact, notes: item.notes },

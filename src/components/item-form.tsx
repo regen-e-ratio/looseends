@@ -7,7 +7,7 @@ import { ITEM_KINDS, kindFields, kindWarning, type ItemKind } from "@/lib/items"
 import { SubmitButton } from "./submit-button";
 import { Alert, Card, Field, Input, Textarea } from "./ui";
 
-type Contact = { id: string; name: string; relationship: string | null };
+type Contact = { id: string; name: string };
 type Initial = { id?: string; values?: Partial<Record<string, string>>; shareWithAll?: boolean; recipientIds?: string[] };
 
 export function ItemForm({ kind, contacts, initial = {} }: { kind: ItemKind; contacts: Contact[]; initial?: Initial }) {
@@ -89,7 +89,6 @@ export function ItemForm({ kind, contacts, initial = {} }: { kind: ItemKind; con
                   className="accent-teal-700"
                 />
                 {c.name}
-                {c.relationship && <span className="text-stone-400">· {c.relationship}</span>}
               </label>
             ))}
           </div>

@@ -7,7 +7,7 @@ import type { FormState } from "@/app/actions/vault";
 import { SubmitButton } from "./submit-button";
 import { Alert, Card, Field, Input, Textarea } from "./ui";
 
-type Initial = { id: string; name: string; email: string; relationship: string | null; personalMessage: string | null };
+type Initial = { id: string; name: string; email: string; personalMessage: string | null };
 
 export function ContactForm({ initial, claimMode = false }: { initial?: Initial; claimMode?: boolean }) {
   const [state, action] = useActionState<FormState, FormData>(saveContactAction, {});
@@ -21,13 +21,10 @@ export function ContactForm({ initial, claimMode = false }: { initial?: Initial;
           <Field label="Name" htmlFor="name" hint={err("name")}>
             <Input id="name" name="name" required maxLength={120} defaultValue={initial?.name} placeholder="e.g. Maria Silva" />
           </Field>
-          <Field label="Relationship (optional)" htmlFor="relationship">
-            <Input id="relationship" name="relationship" maxLength={120} defaultValue={initial?.relationship ?? ""} placeholder="e.g. Sister" />
+          <Field label="Email" htmlFor="email" hint={err("email") ?? "This is where we'll send their private link."}>
+            <Input id="email" name="email" type="email" required defaultValue={initial?.email} placeholder="maria@example.com" />
           </Field>
         </div>
-        <Field label="Email" htmlFor="email" hint={err("email") ?? "This is where we'll send their private link."}>
-          <Input id="email" name="email" type="email" required defaultValue={initial?.email} placeholder="maria@example.com" />
-        </Field>
         <Field label="Personal message (optional)" htmlFor="personalMessage" hint="Only this person will see it. Encrypted.">
           <Textarea
             id="personalMessage"
