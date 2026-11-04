@@ -10,7 +10,7 @@ function key(): Buffer {
     throw new Error("ENCRYPTION_KEY must be set to a random string of at least 32 characters");
   }
   // Derive a fixed 256-bit key from whatever string the operator provided.
-  // The label is part of the key: changing it requires re-encrypting stored data (see scripts/reencrypt.mjs).
+  // The label is part of the key: changing it makes all stored data unreadable.
   cachedKey = createHash("sha256").update(`looseends:v2:${secret}`).digest();
   return cachedKey;
 }

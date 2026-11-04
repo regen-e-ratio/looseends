@@ -51,16 +51,22 @@ export function OnboardingFlow(props: {
     sections.current[i] = el;
   };
 
+  // Set by goTo; the effect below scrolls and focuses once React has committed the new phase
+  // (before that the section is still `inert` and can't take focus).
+  const pendingScroll = useRef<{ smooth: boolean } | null>(null);
   const goTo = (i: number, smooth = true) => {
+    pendingScroll.current = { smooth };
     setCurrent(i);
-    requestAnimationFrame(() => {
-      const el = sections.current[i];
-      if (!el) return;
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      el.scrollIntoView({ behavior: smooth && !reduce ? "smooth" : "auto", block: "start" });
-      el.querySelector<HTMLElement>("input, textarea, button")?.focus({ preventScroll: true });
-    });
   };
+  useEffect(() => {
+    const pending = pendingScroll.current;
+    const el = sections.current[current];
+    if (!pending || !el) return;
+    pendingScroll.current = null;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: pending.smooth && !reduce ? "smooth" : "auto", block: "start" });
+    el.querySelector<HTMLElement>("input, textarea, button")?.focus({ preventScroll: true });
+  }, [current]);
   const complete = (i: number) => {
     setDone((d) => d.map((v, j) => (j === i ? true : v)));
     if (i < 2) goTo(i + 1);

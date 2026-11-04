@@ -3,7 +3,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Recipient } from "@/db/schema";
 import { decrypt, decryptNullable, encrypt } from "./crypto";
-import { isKind, normalizePayload, storedPayloadSchema, type ItemKind, type ItemPayload } from "./items";
+import { isKind, itemInputSchema, type ItemKind, type ItemPayload } from "./items";
 
 const { items, itemRecipients, recipients } = schema;
 
@@ -19,8 +19,8 @@ export type RecipientView = Omit<Recipient, "personalMessage" | "accessTokenHash
   personalMessage: string | null;
 };
 
-function decodePayload(kind: ItemKind, payload: string): ItemPayload {
-  return normalizePayload(kind, storedPayloadSchema.parse(JSON.parse(decrypt(payload))));
+function decodePayload(payload: string): ItemPayload {
+  return itemInputSchema.parse(JSON.parse(decrypt(payload)));
 }
 
 export function encodePayload(p: ItemPayload): string {
@@ -37,7 +37,7 @@ export async function listItems(userId: string): Promise<VaultItem[]> {
   return rows.map((r) => {
     const kind: ItemKind = isKind(r.kind) ? r.kind : "other";
     return {
-    ...decodePayload(kind, r.payload),
+    ...decodePayload(r.payload),
     id: r.id,
     kind,
     shareWithAll: r.shareWithAll,

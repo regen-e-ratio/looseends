@@ -146,41 +146,9 @@ export type ItemPayload = { title: string; reference: string; notes: string };
 
 const opt = (max: number) => z.string().trim().max(max).optional().default("");
 
-/** Validates what the editor submits. */
+/** One item, as the editor submits it and as it is stored (encrypted). */
 export const itemInputSchema = z.object({
   title: z.string().trim().min(1, "Please give it a name").max(200),
   reference: opt(200),
   notes: opt(20_000),
 });
-
-/**
- * What can be found in storage. Items saved before the editor was simplified may also carry
- * `provider`, `amount` and `contact`; they are folded into the notes when read (see normalizePayload).
- */
-export const storedPayloadSchema = itemInputSchema.extend({ provider: opt(300), amount: opt(300), contact: opt(300) });
-
-/** Labels the old fields had, so their values keep their meaning when folded into the notes. */
-const LEGACY_LABELS: Record<ItemKind, Partial<Record<"provider" | "reference" | "amount" | "contact", string>>> = {
-  subscription: { provider: "Billed to", amount: "Cost", contact: "Website or phone" },
-  bank: { provider: "Account type", amount: "Approximate balance", contact: "Branch, advisor or phone" },
-  investment: { provider: "Type", amount: "Approximate value", contact: "Website, advisor or phone" },
-  crypto: { provider: "Type & coins", amount: "Approximate value", contact: "Who can help recover it" },
-  insurance: { provider: "Policy type", amount: "Coverage / premium", contact: "Website or claims phone" },
-  digital: { provider: "What's in it", amount: "Cost", contact: "Website" },
-  other: { provider: "Category", reference: "Reference", amount: "Value", contact: "Contact" },
-  message: {},
-};
-
-/** Turns any stored payload into the simple shape: legacy fields become labelled lines at the top of the notes. */
-export function normalizePayload(kind: ItemKind, stored: z.infer<typeof storedPayloadSchema>): ItemPayload {
-  const hasFind = findField(kind) !== null;
-  const fields: ("provider" | "reference" | "amount" | "contact")[] = hasFind ? ["provider", "amount", "contact"] : ["provider", "reference", "amount", "contact"];
-  const legacy = fields
-    .filter((f) => stored[f])
-    .map((f) => `${LEGACY_LABELS[kind][f] ?? f}: ${stored[f]}`);
-  return {
-    title: stored.title,
-    reference: hasFind ? stored.reference : "",
-    notes: [legacy.join("\n"), stored.notes].filter(Boolean).join("\n\n"),
-  };
-}

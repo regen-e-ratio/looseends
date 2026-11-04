@@ -229,27 +229,15 @@ try {
   assert.equal(rows.length, 3);
   for (const r of rows) assert.ok(r.payload.startsWith("v2.") && !r.payload.includes("Netflix"));
 
-  step("items saved in the old format still show everything (folded into the notes)");
-  {
-    const { createHash, createCipheriv, randomBytes } = await import("node:crypto");
-    const key = createHash("sha256").update(`looseends:v2:${process.env.ENCRYPTION_KEY}`).digest();
-    const iv = randomBytes(12);
-    const c = createCipheriv("aes-256-gcm", key, iv);
-    const plain = JSON.stringify({ title: "Old gym", provider: "Visa", reference: owner, amount: "€35 / month", contact: "", notes: "Cancel" });
-    const ct = Buffer.concat([c.update(plain, "utf8"), c.final()]);
-    const payload = ["v2", iv.toString("base64url"), c.getAuthTag().toString("base64url"), ct.toString("base64url")].join(".");
-    const [{ id: uid }] = await sql`select id from users where email=${owner}`;
-    await sql`insert into items (user_id, kind, payload) values (${uid}, 'subscription', ${payload})`;
-  }
-  await page.goto(`${BASE}/vault`);
-  await page.getByRole("button", { name: /^Old gym/ }).click();
-  assert.equal(await page.getByLabel("Notes").inputValue(), "Billed to: Visa\nCost: €35 / month\n\nCancel");
-
   step("vault page: delete");
+  await page.goto(`${BASE}/vault?new=other`);
+  await page.getByLabel("What is it?").fill("Temporary note");
+  await page.getByRole("button", { name: "Add to vault" }).click();
+  await page.getByText("4 items").waitFor();
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Delete" }).click();
   await page.waitForURL(/\/vault$/);
-  await page.getByRole("button", { name: /^Old gym/ }).waitFor({ state: "detached" }); // list refreshes without a reload
+  await page.getByRole("button", { name: /^Temporary note/ }).waitFor({ state: "detached" }); // list refreshes without a reload
   await page.getByText("3 items").waitFor();
 
   step("preview as Anna (no bank)");

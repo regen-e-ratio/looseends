@@ -16,13 +16,6 @@ const nextConfig: NextConfig = {
       },
     },
   },
-  // The old one-page-per-item URLs now live in the single vault page.
-  async redirects() {
-    return [
-      { source: "/items/new", destination: "/vault", permanent: false },
-      { source: "/items/:id", destination: "/vault?item=:id", permanent: false },
-    ];
-  },
   async headers() {
     // Marketing pages (/ and /for/*) may be indexed; everything else — and especially the token links — never.
     const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
