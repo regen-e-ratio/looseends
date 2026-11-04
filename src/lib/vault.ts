@@ -3,7 +3,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Recipient } from "@/db/schema";
 import { decrypt, decryptNullable, encrypt } from "./crypto";
-import { isKind, itemPayloadSchema, type ItemKind, type ItemPayload } from "./items";
+import { isKind, normalizePayload, storedPayloadSchema, type ItemKind, type ItemPayload } from "./items";
 
 const { items, itemRecipients, recipients } = schema;
 
@@ -19,12 +19,12 @@ export type RecipientView = Omit<Recipient, "personalMessage" | "accessTokenHash
   personalMessage: string | null;
 };
 
-function decodePayload(payload: string): ItemPayload {
-  return itemPayloadSchema.parse(JSON.parse(decrypt(payload)));
+function decodePayload(kind: ItemKind, payload: string): ItemPayload {
+  return normalizePayload(kind, storedPayloadSchema.parse(JSON.parse(decrypt(payload))));
 }
 
 export function encodePayload(p: ItemPayload): string {
-  return encrypt(JSON.stringify(p));
+  return encrypt(JSON.stringify({ title: p.title, reference: p.reference, notes: p.notes }));
 }
 
 export async function listItems(userId: string): Promise<VaultItem[]> {
@@ -34,14 +34,17 @@ export async function listItems(userId: string): Promise<VaultItem[]> {
     .select()
     .from(itemRecipients)
     .where(inArray(itemRecipients.itemId, rows.map((r) => r.id)));
-  return rows.map((r) => ({
-    ...decodePayload(r.payload),
+  return rows.map((r) => {
+    const kind: ItemKind = isKind(r.kind) ? r.kind : "other";
+    return {
+    ...decodePayload(kind, r.payload),
     id: r.id,
-    kind: isKind(r.kind) ? r.kind : "other",
+    kind,
     shareWithAll: r.shareWithAll,
     recipientIds: links.filter((l) => l.itemId === r.id).map((l) => l.recipientId),
     updatedAt: r.updatedAt,
-  }));
+    };
+  });
 }
 
 export async function getItem(userId: string, id: string): Promise<VaultItem | null> {

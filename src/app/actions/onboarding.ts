@@ -56,7 +56,7 @@ export async function saveStepOneAction(_prev: StepState, formData: FormData): P
     createdAt: new Date(Date.now() + i),
     kind: r.kind,
     shareWithAll: true,
-    payload: encodePayload({ provider: "", reference: "", amount: "", contact: "", notes: "", ...r.payload }),
+    payload: encodePayload({ reference: "", notes: "", ...r.payload }),
   }));
 
   await db.transaction(async (tx) => {

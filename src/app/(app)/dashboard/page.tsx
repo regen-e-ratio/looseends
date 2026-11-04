@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { ITEM_KINDS, KIND_ORDER } from "@/lib/items";
 import { listItems, listRecipients } from "@/lib/vault";
 
-export const metadata = { title: "My vault" };
+export const metadata = { title: "Home" };
 
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   const user = await requireUser();
@@ -13,7 +13,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const nameOf = new Map(contacts.map((c) => [c.id, c.name]));
 
   const steps = [
-    { done: items.length > 0, label: "Add your first item", href: "/items/new?kind=subscription" },
+    { done: items.length > 0, label: "Add your first item", href: "/vault?new=subscription" },
     { done: contacts.length > 0, label: "Add a trusted contact", href: "/contacts/new" },
     { done: user.switchEnabled, label: "Turn on your release switch", href: "/settings" },
   ];
@@ -65,67 +65,56 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       )}
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Add to your vault</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-          {KIND_ORDER.map((k) => (
-            <Link
-              key={k}
-              href={`/items/new?kind=${k}`}
-              className="rounded-lg border border-stone-200 bg-white p-3 text-center shadow-sm transition hover:border-teal-600 hover:shadow"
-            >
-              <div className="text-2xl">{ITEM_KINDS[k].icon}</div>
-              <div className="mt-1 text-sm font-medium">{ITEM_KINDS[k].label}</div>
-            </Link>
-          ))}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">
+            Your vault <span className="font-normal text-stone-400">({items.length})</span>
+          </h2>
+          <LinkButton href="/vault" variant="secondary" className="py-1.5">
+            {items.length ? "Open vault" : "+ Add"}
+          </LinkButton>
         </div>
+        {items.length === 0 ? (
+          <Card className="text-sm text-stone-600">
+            Start with what would be hardest to discover: subscriptions that keep charging, accounts nobody knows about, and a message
+            to the people you love.{" "}
+            <Link href="/vault?new=subscription" className="font-medium text-teal-800 hover:underline">
+              Add your first item →
+            </Link>
+          </Card>
+        ) : (
+          <div className="columns-1 gap-4 rounded-xl border border-stone-200 bg-white p-4 shadow-sm md:columns-2">
+            {KIND_ORDER.map((k) => {
+              const group = items.filter((i) => i.kind === k);
+              if (!group.length) return null;
+              return (
+                <div key={k} className="mb-3 break-inside-avoid">
+                  <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-stone-400">
+                    {ITEM_KINDS[k].icon} {ITEM_KINDS[k].plural} ({group.length})
+                  </p>
+                  <ul>
+                    {group.map((item) => (
+                      <li key={item.id}>
+                        <Link
+                          href={`/vault?item=${item.id}`}
+                          className="flex items-center gap-3 rounded-md px-2 py-1.5 text-sm hover:bg-stone-50"
+                        >
+                          <span className="min-w-0 flex-1 truncate">
+                            <span className="font-medium">{item.title}</span>
+                            {item.reference && <span className="text-stone-500"> · {item.reference}</span>}
+                          </span>
+                          {!item.shareWithAll && (
+                            <Badge tone="amber">{item.recipientIds.map((id) => nameOf.get(id)).filter(Boolean).join(", ") || "Nobody"}</Badge>
+                          )}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
-
-      {items.length === 0 ? (
-        <Card className="text-center text-stone-600">
-          <p className="text-3xl">🗂️</p>
-          <p className="mt-2 font-medium text-stone-800">Your vault is empty</p>
-          <p className="mt-1 text-sm">
-            Start with the things that would be hardest to discover: subscriptions that keep charging, accounts nobody knows about,
-            and a message to the people you love.
-          </p>
-        </Card>
-      ) : (
-        KIND_ORDER.map((k) => {
-          const group = items.filter((i) => i.kind === k);
-          if (!group.length) return null;
-          return (
-            <section key={k} id={k}>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">
-                  {ITEM_KINDS[k].icon} {ITEM_KINDS[k].plural} <span className="font-normal text-stone-400">({group.length})</span>
-                </h2>
-                <LinkButton href={`/items/new?kind=${k}`} variant="ghost" className="text-teal-800">
-                  + Add
-                </LinkButton>
-              </div>
-              <div className="divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
-                {group.map((item) => (
-                  <Link key={item.id} href={`/items/${item.id}`} className="flex items-center gap-4 px-5 py-4 hover:bg-stone-50">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{item.title}</div>
-                      <div className="truncate text-sm text-stone-500">
-                        {k === "message" ? item.notes.slice(0, 120) : [item.provider, item.amount].filter(Boolean).join(" · ") || "—"}
-                      </div>
-                    </div>
-                    <div className="shrink-0">
-                      {item.shareWithAll ? (
-                        <Badge>Everyone</Badge>
-                      ) : (
-                        <Badge tone="amber">{item.recipientIds.map((id) => nameOf.get(id)).filter(Boolean).join(", ") || "Nobody"}</Badge>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          );
-        })
-      )}
     </div>
   );
 }

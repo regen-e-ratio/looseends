@@ -1,18 +1,25 @@
 import { z } from "zod";
 
+type Field = { label: string; placeholder: string };
+
+/**
+ * What can be stored in the vault. Every kind has the same simple shape:
+ * - `title`: the name (required)
+ * - `find`:  the one thing needed to find it (stored as `reference`), when the kind has one
+ * - `notes`: free text, with a faint placeholder and `ideas` shown in an info tooltip
+ */
 export const ITEM_KINDS = {
   subscription: {
     label: "Subscription",
     plural: "Subscriptions",
     icon: "🔁",
-    hint: "Streaming, software, gym, memberships, utilities…",
-    fields: {
-      title: { label: "Service", placeholder: "Netflix" },
-      provider: { label: "Billed to", placeholder: "Visa ending 4242 / PayPal" },
-      reference: { label: "Login email / username", placeholder: "me@example.com" },
-      amount: { label: "Cost", placeholder: "€15.99 / month" },
-      contact: { label: "Website or phone", placeholder: "netflix.com/cancel" },
-      notes: { label: "What should happen to it?", placeholder: "Cancel it. The account is in my name only." },
+    hint: "Streaming, software, gym, phone plan…",
+    title: { label: "Service", placeholder: "e.g. Netflix" },
+    find: { label: "Account email", placeholder: "Email used for this account" },
+    notes: {
+      label: "Notes",
+      placeholder: "Cancel it, or keep it for the family? Anything they should know.",
+      ideas: ["What it costs and how it's paid", "Cancel it, or keep it — and for whom", "How to cancel: website, phone or app", "Who else uses it"],
     },
   },
   bank: {
@@ -20,46 +27,45 @@ export const ITEM_KINDS = {
     plural: "Bank accounts",
     icon: "🏦",
     hint: "Current, savings, credit cards, loans…",
-    fields: {
-      title: { label: "Bank", placeholder: "ING" },
-      provider: { label: "Account type", placeholder: "Joint savings account" },
-      reference: { label: "Account / IBAN (consider only the last digits)", placeholder: "NL•• •••• •••• 1234" },
-      amount: { label: "Approximate balance", placeholder: "≈ €10,000" },
-      contact: { label: "Branch, advisor or phone", placeholder: "+31 20 000 0000" },
-      notes: { label: "Notes & instructions", placeholder: "Contact the bereavement team with a death certificate." },
+    title: { label: "Bank", placeholder: "e.g. ING" },
+    find: { label: "Account", placeholder: "Last digits, e.g. •••• 1234" },
+    notes: {
+      label: "Notes",
+      placeholder: "What should happen to this account?",
+      ideas: ["Type: current, savings, credit card, loan", "Roughly how much is in it", "Joint, or only in your name", "Branch or advisor to contact", "Where cards and statements are kept"],
     },
   },
   investment: {
     label: "Investment",
     plural: "Investments",
     icon: "📈",
-    hint: "Brokerage, pensions, crypto, property, shares…",
-    fields: {
-      title: { label: "Platform / institution", placeholder: "Vanguard" },
-      provider: { label: "Type", placeholder: "Pension / ETF portfolio / crypto wallet" },
-      reference: { label: "Account or reference number", placeholder: "Ends in 9876" },
-      amount: { label: "Approximate value", placeholder: "≈ $45,000" },
-      contact: { label: "Website, advisor or phone", placeholder: "vanguard.com" },
-      notes: { label: "Notes & instructions", placeholder: "Beneficiary is set to my partner. Where the hardware wallet is kept…" },
+    hint: "Brokerage, pensions, shares, property…",
+    title: { label: "Platform or institution", placeholder: "e.g. Vanguard" },
+    find: { label: "Account email or number", placeholder: "Login email or account number" },
+    notes: {
+      label: "Notes",
+      placeholder: "Anything they need to know to claim it.",
+      ideas: ["Type: pension, funds, shares, property", "Roughly what it's worth", "Named beneficiaries", "Advisor or platform contact", "Where the documents are"],
     },
   },
   crypto: {
     label: "Crypto wallet",
     plural: "Crypto wallets",
     icon: "🪙",
-    hint: "Hardware wallets, exchange accounts, software wallets…",
-    warning:
-      "Never write your seed phrase, private keys or PINs here — not even partly. Describe what exists, where the backup is kept and who can help recover it.",
-    fields: {
-      title: { label: "Wallet or exchange", placeholder: "Hardware wallet — cold storage" },
-      provider: { label: "Type & coins", placeholder: "Hardware wallet · BTC and ETH" },
-      reference: { label: "Where the device / backup is kept", placeholder: "Device in the home safe; steel backup at my parents' house" },
-      amount: { label: "Approximate value", placeholder: "≈ $25,000" },
-      contact: { label: "Who can help recover it", placeholder: "My friend Sam (+1 555 0100) knows how to restore it" },
-      notes: {
-        label: "Recovery steps",
-        placeholder: "1. Install the wallet's official app\n2. Use the backup to restore…\nNo passphrase. Beware of anyone offering “recovery help”.",
-      },
+    hint: "Hardware wallets, exchange accounts…",
+    warning: "Never write your seed phrase, private keys or PINs here — not even partly.",
+    title: { label: "Wallet or exchange", placeholder: "e.g. Hardware wallet" },
+    find: { label: "Where to find it", placeholder: "e.g. home safe, or login email" },
+    notes: {
+      label: "How to recover it",
+      placeholder: "Steps to recover it — never the seed phrase itself.",
+      ideas: [
+        "Which coins, and roughly how much",
+        "Which wallet app to install",
+        "Where the backup is kept (not the words)",
+        "Whether there's a passphrase",
+        "Who can help — and to ignore anyone offering “recovery” help",
+      ],
     },
   },
   insurance: {
@@ -67,13 +73,12 @@ export const ITEM_KINDS = {
     plural: "Insurance",
     icon: "🛡️",
     hint: "Life, health, home, car…",
-    fields: {
-      title: { label: "Insurer", placeholder: "Allianz" },
-      provider: { label: "Policy type", placeholder: "Life insurance" },
-      reference: { label: "Policy number", placeholder: "POL-123456" },
-      amount: { label: "Coverage / premium", placeholder: "€200,000 cover" },
-      contact: { label: "Website or claims phone", placeholder: "+44 800 000 000" },
-      notes: { label: "Notes & instructions", placeholder: "Make a claim within 90 days." },
+    title: { label: "Insurer", placeholder: "e.g. Allianz life insurance" },
+    find: { label: "Policy number", placeholder: "e.g. POL-123456" },
+    notes: {
+      label: "Notes",
+      placeholder: "How to make a claim.",
+      ideas: ["Type of policy and what it covers", "Who the beneficiaries are", "Claims phone number or website", "Deadlines to claim", "Where the policy documents are"],
     },
   },
   digital: {
@@ -81,74 +86,101 @@ export const ITEM_KINDS = {
     plural: "Online accounts",
     icon: "💻",
     hint: "Email, social media, cloud storage, photos…",
-    fields: {
-      title: { label: "Service", placeholder: "Google account" },
-      provider: { label: "What's in it", placeholder: "Email & family photos" },
-      reference: { label: "Username / email", placeholder: "me@gmail.com" },
-      amount: { label: "Cost (if any)", placeholder: "Free" },
-      contact: { label: "Website", placeholder: "myaccount.google.com" },
-      notes: { label: "What should happen to it?", placeholder: "Download the photos, then memorialize/close it." },
+    title: { label: "Service", placeholder: "e.g. Google account" },
+    find: { label: "Username or email", placeholder: "How you sign in" },
+    notes: {
+      label: "Notes",
+      placeholder: "Delete it, memorialise it or keep it?",
+      ideas: ["What's in it: photos, documents, email", "Anything to download first", "Delete, memorialise or keep it", "Where the password is kept (never the password)"],
     },
   },
   other: {
     label: "Other",
     plural: "Other",
     icon: "📁",
-    hint: "Property, vehicles, debts, documents, pets…",
-    fields: {
-      title: { label: "Title", placeholder: "House deeds" },
-      provider: { label: "Category", placeholder: "Documents" },
-      reference: { label: "Reference", placeholder: "" },
-      amount: { label: "Value", placeholder: "" },
-      contact: { label: "Contact", placeholder: "Notary: Jane Doe, +1 555 0100" },
-      notes: { label: "Notes & instructions", placeholder: "Original is in the fire safe in the study." },
+    hint: "Property, vehicles, documents, pets…",
+    title: { label: "What is it?", placeholder: "e.g. House deeds" },
+    notes: {
+      label: "Notes",
+      placeholder: "Everything they need to know about it.",
+      ideas: ["Where it is", "Who to contact", "What you'd like to happen to it", "Documents that prove ownership"],
     },
   },
   message: {
     label: "Message",
     plural: "Messages",
     icon: "✉️",
-    hint: "A personal letter, wishes or general instructions.",
-    fields: {
-      title: { label: "Subject", placeholder: "To my family" },
-      notes: { label: "Message", placeholder: "Write anything you want them to read…" },
+    hint: "A personal letter, wishes or instructions.",
+    title: { label: "Subject", placeholder: "e.g. To my family" },
+    notes: {
+      label: "Message",
+      placeholder: "Write anything you want them to read…",
+      ideas: ["A thank-you", "Memories you want to share", "Your wishes for the funeral", "Advice for the years ahead"],
     },
   },
-} as const;
+} as const satisfies Record<
+  string,
+  { label: string; plural: string; icon: string; hint: string; warning?: string; title: Field; find?: Field; notes: Field & { ideas: readonly string[] } }
+>;
 
 export type ItemKind = keyof typeof ITEM_KINDS;
 export const KIND_ORDER = Object.keys(ITEM_KINDS) as ItemKind[];
-export type FieldName = "title" | "provider" | "reference" | "amount" | "contact" | "notes";
-export const FIELD_ORDER: FieldName[] = ["title", "provider", "reference", "amount", "contact", "notes"];
-
-const DEFAULT_WARNING =
-  "Encrypted before it's stored. Still, never write passwords or full card numbers — say where to find them instead (e.g. “in my password manager”).";
-
-/** Safety note shown under the item form. */
-export function kindWarning(kind: ItemKind): string | null {
-  if (kind === "message") return null;
-  const k = ITEM_KINDS[kind];
-  return "warning" in k ? k.warning : DEFAULT_WARNING;
-}
 
 export function isKind(k: unknown): k is ItemKind {
   return typeof k === "string" && k in ITEM_KINDS;
 }
 
-export function kindFields(kind: ItemKind): { name: FieldName; label: string; placeholder: string }[] {
-  const f = ITEM_KINDS[kind].fields as Partial<Record<FieldName, { label: string; placeholder: string }>>;
-  return FIELD_ORDER.filter((n) => f[n]).map((n) => ({ name: n, ...f[n]! }));
+/** The "how to find it" field of a kind, if it has one. */
+export function findField(kind: ItemKind): Field | null {
+  const k = ITEM_KINDS[kind];
+  return "find" in k ? k.find : null;
 }
+
+export function kindWarning(kind: ItemKind): string | null {
+  const k = ITEM_KINDS[kind];
+  return "warning" in k ? k.warning : null;
+}
+
+/** What the app works with. */
+export type ItemPayload = { title: string; reference: string; notes: string };
 
 const opt = (max: number) => z.string().trim().max(max).optional().default("");
 
-export const itemPayloadSchema = z.object({
+/** Validates what the editor submits. */
+export const itemInputSchema = z.object({
   title: z.string().trim().min(1, "Please give it a name").max(200),
-  provider: opt(200),
   reference: opt(200),
-  amount: opt(100),
-  contact: opt(300),
   notes: opt(20_000),
 });
 
-export type ItemPayload = z.infer<typeof itemPayloadSchema>;
+/**
+ * What can be found in storage. Items saved before the editor was simplified may also carry
+ * `provider`, `amount` and `contact`; they are folded into the notes when read (see normalizePayload).
+ */
+export const storedPayloadSchema = itemInputSchema.extend({ provider: opt(300), amount: opt(300), contact: opt(300) });
+
+/** Labels the old fields had, so their values keep their meaning when folded into the notes. */
+const LEGACY_LABELS: Record<ItemKind, Partial<Record<"provider" | "reference" | "amount" | "contact", string>>> = {
+  subscription: { provider: "Billed to", amount: "Cost", contact: "Website or phone" },
+  bank: { provider: "Account type", amount: "Approximate balance", contact: "Branch, advisor or phone" },
+  investment: { provider: "Type", amount: "Approximate value", contact: "Website, advisor or phone" },
+  crypto: { provider: "Type & coins", amount: "Approximate value", contact: "Who can help recover it" },
+  insurance: { provider: "Policy type", amount: "Coverage / premium", contact: "Website or claims phone" },
+  digital: { provider: "What's in it", amount: "Cost", contact: "Website" },
+  other: { provider: "Category", reference: "Reference", amount: "Value", contact: "Contact" },
+  message: {},
+};
+
+/** Turns any stored payload into the simple shape: legacy fields become labelled lines at the top of the notes. */
+export function normalizePayload(kind: ItemKind, stored: z.infer<typeof storedPayloadSchema>): ItemPayload {
+  const hasFind = findField(kind) !== null;
+  const fields: ("provider" | "reference" | "amount" | "contact")[] = hasFind ? ["provider", "amount", "contact"] : ["provider", "reference", "amount", "contact"];
+  const legacy = fields
+    .filter((f) => stored[f])
+    .map((f) => `${LEGACY_LABELS[kind][f] ?? f}: ${stored[f]}`);
+  return {
+    title: stored.title,
+    reference: hasFind ? stored.reference : "",
+    notes: [legacy.join("\n"), stored.notes].filter(Boolean).join("\n\n"),
+  };
+}

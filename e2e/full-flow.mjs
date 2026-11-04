@@ -151,20 +151,56 @@ try {
   await p2.getByText("This link has expired").waitFor();
   await p2.close();
 
-  step("add items");
-  async function addItem(kind, fields) {
-    await page.goto(`${BASE}/items/new?kind=${kind}`);
-    for (const [label, value] of Object.entries(fields)) await page.getByLabel(label, { exact: false }).first().fill(value);
-    await page.getByRole("button", { name: /^Add / }).click();
-    await page.waitForURL("**/dashboard?saved=1*");
-  }
-  await addItem("bank", { Bank: "ING", "Approximate balance": "≈ €10,000", "Notes & instructions": "Bereavement team" });
+  step("vault page: add from the menu; the URL follows the selection; no page reloads");
+  await page.goto(`${BASE}/vault`);
+  await page.getByText("2 items").waitFor();
+  await page.evaluate(() => (window.__sameDocument = true));
+  const sameDocument = () => page.evaluate(() => window.__sameDocument === true);
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByRole("menuitem", { name: /Bank account/ }).click();
+  await page.waitForURL("**/vault?new=bank");
+  await page.getByLabel("Bank", { exact: true }).fill("ING");
+  await page.getByLabel("Account", { exact: true }).fill("•••• 1234");
+  await page.getByLabel("Notes").fill("Bereavement team");
+  await page.getByRole("button", { name: "Add to vault" }).click();
+  await page.waitForURL(/\/vault\?item=[0-9a-f-]{36}$/);
+  await page.getByText("✓ Saved").waitFor();
+  await page.getByRole("button", { name: /^ING/ }).waitFor(); // now in the list on the left
+  await page.getByText("3 items").waitFor();
+  assert.ok(await sameDocument(), "adding an item doesn't reload the page");
+  await shot("05-vault-bank");
 
-  step("validation error on empty title");
-  await page.goto(`${BASE}/items/new?kind=investment`);
-  await page.locator("#title").evaluate((el) => el.removeAttribute("required"));
-  await page.getByRole("button", { name: /^Add / }).click();
+  step("vault page: validation, switching, unsaved-changes guard, back button");
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByRole("menuitem", { name: /Investment/ }).click();
+  await page.getByRole("button", { name: "Add to vault" }).click();
   await page.getByText("Please give it a name").waitFor();
+  assert.ok(page.url().endsWith("/vault?new=investment"));
+  await page.getByRole("button", { name: /^Netflix/ }).click();
+  await page.waitForURL(/\/vault\?item=/);
+  await page.getByRole("heading", { name: "Netflix" }).waitFor();
+  assert.equal(await page.getByLabel("Account email").inputValue(), owner, "account email from onboarding");
+  await page.getByLabel("Notes").fill("Cancel it please");
+  page.once("dialog", (d) => d.dismiss()); // unsaved change → stay
+  await page.getByRole("button", { name: /^ING/ }).click();
+  await page.getByRole("heading", { name: "Netflix" }).waitFor();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await page.getByText("✓ Saved").waitFor();
+  const netflixUrl = page.url();
+  await page.getByRole("button", { name: /^ING/ }).click(); // saved → no prompt
+  await page.getByRole("heading", { name: "ING" }).waitFor();
+  await page.goBack();
+  await page.getByRole("heading", { name: "Netflix" }).waitFor();
+  assert.equal(page.url(), netflixUrl);
+  assert.equal(await page.getByLabel("Notes").inputValue(), "Cancel it please");
+  assert.ok(await sameDocument(), "switching items doesn't reload the page");
+
+  step("vault page: ideas tooltip");
+  await page.getByRole("button", { name: /^ING/ }).click();
+  await page.getByRole("button", { name: "Ideas for what to write about this bank account" }).hover();
+  await page.getByRole("tooltip").filter({ hasText: "Roughly how much is in it" }).waitFor();
+  await shot("05-vault-tooltip");
+  await page.mouse.move(0, 0);
 
   step("give Anna a personal message");
   const [{ id: annaId }] = await sql`select id from recipients where email=${anna}`;
@@ -175,13 +211,16 @@ try {
   await page.waitForURL("**/contacts?saved=1");
   await shot("04-contacts");
 
-  step("share bank only with Bob");
+  step("share bank only with Bob (from the dashboard into the vault)");
   await page.goto(`${BASE}/dashboard`);
   await page.getByRole("link", { name: /ING/ }).click();
-  await page.getByLabel("Only specific people").check();
+  await page.waitForURL(/\/vault\?item=/);
+  await page.getByRole("heading", { name: "ING" }).waitFor();
+  await page.getByText("Only some people").click();
   await page.getByLabel(/Bob Example/).check();
   await page.getByRole("button", { name: "Save changes" }).click();
-  await page.waitForURL("**/dashboard?saved=1*");
+  await page.getByText("✓ Saved").waitFor();
+  await page.goto(`${BASE}/dashboard`);
   await page.getByText("Bob Example", { exact: true }).waitFor();
   await shot("05-dashboard-items");
 
@@ -189,6 +228,29 @@ try {
   const rows = await sql`select payload from items i join users u on u.id=i.user_id where u.email=${owner}`;
   assert.equal(rows.length, 3);
   for (const r of rows) assert.ok(r.payload.startsWith("v2.") && !r.payload.includes("Netflix"));
+
+  step("items saved in the old format still show everything (folded into the notes)");
+  {
+    const { createHash, createCipheriv, randomBytes } = await import("node:crypto");
+    const key = createHash("sha256").update(`looseends:v2:${process.env.ENCRYPTION_KEY}`).digest();
+    const iv = randomBytes(12);
+    const c = createCipheriv("aes-256-gcm", key, iv);
+    const plain = JSON.stringify({ title: "Old gym", provider: "Visa", reference: owner, amount: "€35 / month", contact: "", notes: "Cancel" });
+    const ct = Buffer.concat([c.update(plain, "utf8"), c.final()]);
+    const payload = ["v2", iv.toString("base64url"), c.getAuthTag().toString("base64url"), ct.toString("base64url")].join(".");
+    const [{ id: uid }] = await sql`select id from users where email=${owner}`;
+    await sql`insert into items (user_id, kind, payload) values (${uid}, 'subscription', ${payload})`;
+  }
+  await page.goto(`${BASE}/vault`);
+  await page.getByRole("button", { name: /^Old gym/ }).click();
+  assert.equal(await page.getByLabel("Notes").inputValue(), "Billed to: Visa\nCost: €35 / month\n\nCancel");
+
+  step("vault page: delete");
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Delete" }).click();
+  await page.waitForURL(/\/vault$/);
+  await page.getByRole("button", { name: /^Old gym/ }).waitFor({ state: "detached" }); // list refreshes without a reload
+  await page.getByText("3 items").waitFor();
 
   step("preview as Anna (no bank)");
   await page.goto(`${BASE}/preview/${annaId}`);
@@ -264,7 +326,7 @@ try {
   await rp.getByRole("heading", { name: "Information from Joana Example" }).waitFor();
   await rp.getByText("Anna, you were the best sister.").waitFor();
   await rp.getByText("I love you all.", { exact: false }).waitFor();
-  await rp.getByText("Login email / username").waitFor(); // how to find the Netflix account
+  await rp.getByText("Account email").waitFor(); // how to find the Netflix account
   assert.equal(await rp.getByText("ING", { exact: true }).count(), 0, "bank hidden from Anna");
   await rp.screenshot({ path: `${SHOTS}/09-recipient-anna.png`, fullPage: true });
 

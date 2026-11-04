@@ -7,6 +7,7 @@ const cases: [string, string][] = [
   [`${B}/check-in?u=8b1f0e3e-1111-4222-8333-944445555666&t=secret`, `${B}/check-in`],
   [`${B}/auth/verify?token=secret`, `${B}/auth/verify`],
   [`${B}/items/8b1f0e3e-1111-4222-8333-944445555666`, `${B}/items/[id]`],
+  [`${B}/vault?item=8b1f0e3e-1111-4222-8333-944445555666`, `${B}/vault`],
   [`${B}/preview/8b1f0e3e-1111-4222-8333-944445555666`, `${B}/preview/[id]`],
   [`${B}/login?from=crypto&utm_source=meta&fbclid=x&email=a@b.c`, `${B}/login?from=crypto&utm_source=meta`],
   [`${B}/for/family?utm_campaign=nov#how`, `${B}/for/family?utm_campaign=nov`],

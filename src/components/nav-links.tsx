@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { cx } from "./ui";
 
 const links = [
-  { href: "/dashboard", label: "My vault", match: ["/dashboard", "/items"] },
+  { href: "/dashboard", label: "Home", match: ["/dashboard"] },
+  { href: "/vault", label: "My vault", match: ["/vault"] },
   { href: "/contacts", label: "Trusted contacts", match: ["/contacts", "/preview"] },
-  { href: "/settings", label: "Check-in & settings", match: ["/settings"] },
+  { href: "/settings", label: "Settings", match: ["/settings"] },
 ];
 
 export function NavLinks() {
@@ -21,7 +22,7 @@ export function NavLinks() {
             key={l.href}
             href={l.href}
             className={cx(
-              "whitespace-nowrap rounded-md px-3 py-1.5 font-medium",
+              "whitespace-nowrap rounded-md px-2.5 py-1.5 font-medium sm:px-3",
               active ? "bg-teal-50 text-teal-800" : "text-stone-600 hover:bg-stone-100",
             )}
           >

@@ -10,7 +10,8 @@ A private "dead man's switch" vault. People record their subscriptions, bank acc
 
 1. **Sign in with email**: passwordless magic links. Signing up and signing in are the same flow.
    New users then go through **onboarding** (`/onboarding`), until they finish or skip it (`users.onboarded_at`). It has 3 phases: (1) name, a message and one-tap subscriptions, plus audience-specific suggestions for people who arrived from an ad (`src/lib/onboarding.ts`); (2) trusted contacts, with no emails sent yet; (3) choose email check-ins or contacts claim, which switches it on and sends the matching emails. Progress is derived from saved data, so a reload resumes at the right phase.
-2. **Vault**: items of 8 kinds (subscription, bank, investment, crypto wallet, insurance, online account, other, message). Item contents are encrypted with AES-256-GCM before being stored.
+2. **Vault**: items of 8 kinds (subscription, bank, investment, crypto wallet, insurance, online account, other, message). Each item is just a name, one "how to find it" field (account email, last digits, policy number…) and free-text notes, with an ideas tooltip (`src/lib/items.ts`). Contents are encrypted with AES-256-GCM before being stored. Items saved with the older, longer form keep their extra fields: they're folded into the notes as labelled lines when read (`normalizePayload`).
+   Everything is seen, added and edited on **one page**, `/vault`. The selection lives in the URL (`?item=<id>` / `?new=<kind>`), so switching is instant and back/forward work. The dashboard shows a compact overview.
 3. **Trusted contacts**: name, email, optional personal message (also encrypted). Each item is shared with *everyone* or *selected contacts*.
 4. **Release switch**: the owner picks one of two modes (never both), in Check-in & settings:
    - **Email check-ins** (`checkin`): every N days (7–180) the owner must check in. Overdue → status `warning` and reminders every 1–3 days for the grace period (3–30 days) → `triggered`: each contact gets an email with a personal `/access/<token>` link, and the owner gets a notice.
@@ -36,7 +37,7 @@ src/
     robots.ts, sitemap.ts        only / and /for/* are indexable
     login/, auth/verify/         magic-link sign-in (GET shows a button; POST consumes the token, so email scanners can't burn it)
     onboarding/                  first-time setup in 3 phases (vault, people, release mode)
-    (app)/dashboard|items|contacts|settings|preview   signed-in area
+    (app)/dashboard|vault|contacts|settings|preview   signed-in area (vault = one-page editor)
     check-in/                    one-click "I'm OK" from reminder emails
     access/[token]/              what a contact sees after release
     api/cron/check-switches/     daily job

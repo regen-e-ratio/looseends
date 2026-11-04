@@ -1,4 +1,4 @@
-import { ITEM_KINDS, KIND_ORDER, kindFields } from "@/lib/items";
+import { ITEM_KINDS, KIND_ORDER, findField } from "@/lib/items";
 import type { VaultItem } from "@/lib/vault";
 import { formatDate } from "./ui";
 
@@ -64,14 +64,18 @@ export function RecipientVault({
               <article key={item.id} className="break-inside-avoid rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
                 <h3 className="font-semibold">{item.title}</h3>
                 <dl className="mt-3 space-y-2 text-sm">
-                  {kindFields(item.kind)
-                    .filter((f) => f.name !== "title" && item[f.name])
-                    .map((f) => (
-                      <div key={f.name}>
-                        <dt className="text-stone-500">{f.label}</dt>
-                        <dd className="whitespace-pre-wrap break-words text-stone-900">{item[f.name]}</dd>
-                      </div>
-                    ))}
+                  {item.reference && (
+                    <div>
+                      <dt className="text-stone-500">{findField(item.kind)?.label}</dt>
+                      <dd className="break-words text-stone-900">{item.reference}</dd>
+                    </div>
+                  )}
+                  {item.notes && (
+                    <div>
+                      <dt className="text-stone-500">{ITEM_KINDS[item.kind].notes.label}</dt>
+                      <dd className="whitespace-pre-wrap break-words text-stone-900">{item.notes}</dd>
+                    </div>
+                  )}
                 </dl>
               </article>
             ))}
