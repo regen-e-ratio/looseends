@@ -43,6 +43,13 @@
       "when": 1793827348609,
       "tag": "0005_security_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793831186088,
+      "tag": "0006_billing",
+      "breakpoints": true
     }
   ]
 }

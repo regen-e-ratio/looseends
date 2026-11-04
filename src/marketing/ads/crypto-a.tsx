@@ -18,7 +18,7 @@ function Terminal({ from }: AdProps) {
       className={mono.className}
       logo={{ bg: "#F7931A", fg: "#050505", text: "#E6E6E6" }}
       style={{ background: "#050505", color: "#E6E6E6" }}
-      footer="free · no seed phrases · no wallet connections · no KYC"
+      footer="€39/yr · no seed phrases · no wallet connections · no KYC"
     >
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-[0.06]"
@@ -37,7 +37,7 @@ function Terminal({ from }: AdProps) {
             phrase.
           </p>
           <AdCta from={from} className="mt-8 rounded-md bg-[#F7931A] font-bold text-black hover:bg-[#FFA940]">
-            &gt; map_my_wallets --free
+            &gt; map_my_wallets
           </AdCta>
         </div>
         <div className={`w-full overflow-hidden rounded-xl border border-white/15 bg-[#0D0D0D] shadow-2xl shadow-[#F7931A]/10 ${visualWhenRoom}`} aria-hidden="true">

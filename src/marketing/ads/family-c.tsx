@@ -27,7 +27,7 @@ function Garden({ from }: AdProps) {
     <AdFrame
       logo={{ bg: "#22392B", fg: "#E4EBDD", text: "#22392B" }}
       style={{ background: "linear-gradient(180deg, #E7EDE1 0%, #D5E0CD 100%)", color: "#22392B" }}
-      footer="Free · Private and encrypted · A family member can help you set it up"
+      footer="€39 a year · Private and encrypted · A family member can help you set it up"
     >
       <Leaf className="pointer-events-none absolute -left-10 bottom-0 -z-10 h-72 w-72 opacity-50" />
       <Leaf className="pointer-events-none absolute -right-8 -top-6 -z-10 h-64 w-64 rotate-180 opacity-40" />

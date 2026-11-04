@@ -36,7 +36,8 @@ function urlFor(sel: Selection): string {
  * The editor is keyed by the selection, so it re-renders for every switch. Unsaved edits are kept as a
  * draft per selection, so switching away (or pressing Back) never loses them; they're marked "Unsaved".
  */
-export function VaultEditor({ items, contacts }: { items: VaultItem[]; contacts: Contact[] }) {
+/** `readOnly`: the subscription has ended, so the vault can be read but not changed. */
+export function VaultEditor({ items, contacts, readOnly = false }: { items: VaultItem[]; contacts: Contact[]; readOnly?: boolean }) {
   const params = useSearchParams();
   const selection = readSelection(new URLSearchParams(params.toString()));
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -73,7 +74,7 @@ export function VaultEditor({ items, contacts }: { items: VaultItem[]; contacts:
   return (
     <div className="grid gap-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
       <aside className={cx("lg:sticky lg:top-6", selection && "max-lg:hidden")} aria-label="Everything in your vault">
-        <ItemList items={items} selection={selection} onSelect={select} unsaved={drafts} />
+        <ItemList items={items} selection={selection} onSelect={select} unsaved={drafts} readOnly={readOnly} />
       </aside>
 
       <section className={cx(!selection && "max-lg:hidden")} aria-label="Editor">
@@ -82,7 +83,11 @@ export function VaultEditor({ items, contacts }: { items: VaultItem[]; contacts:
             ← Everything in my vault
           </button>
         )}
-        {!selection ? (
+        {readOnly && selection?.type !== "item" ? (
+          <Card>
+            <p className="text-stone-600">Pick anything on the left to read it. Renew your subscription to add or change things.</p>
+          </Card>
+        ) : !selection ? (
           <AddPanel onPick={(kind) => select({ type: "new", kind })} />
         ) : selection.type === "item" && !current ? (
           <Card>
@@ -95,6 +100,7 @@ export function VaultEditor({ items, contacts }: { items: VaultItem[]; contacts:
             item={current}
             contacts={contacts}
             justCreated={!!current && current.id === justCreated}
+            readOnly={readOnly}
             draft={drafts[key]}
             onDraft={(d) => setDraft(key, d)}
             onDiscard={() => {
@@ -125,11 +131,13 @@ function ItemList({
   selection,
   onSelect,
   unsaved,
+  readOnly,
 }: {
   items: VaultItem[];
   selection: Selection;
   onSelect: (s: Selection) => void;
   unsaved: Record<string, Draft>;
+  readOnly: boolean;
 }) {
   const groups = KIND_ORDER.map((k) => ({ kind: k, items: items.filter((i) => i.kind === k) })).filter((g) => g.items.length);
   return (
@@ -138,7 +146,7 @@ function ItemList({
         <p className="text-sm font-medium text-stone-600">
           {items.length} item{items.length === 1 ? "" : "s"}
         </p>
-        <AddMenu onPick={(kind) => onSelect({ type: "new", kind })} active={selection?.type === "new"} />
+        {!readOnly && <AddMenu onPick={(kind) => onSelect({ type: "new", kind })} active={selection?.type === "new"} />}
       </div>
       {groups.length === 0 ? (
         <p className="px-4 py-6 text-sm text-stone-500">Nothing here yet. Use “+ Add” to write down your first thing.</p>
@@ -268,6 +276,7 @@ function ItemEditor({
   onKindChange,
   onCreated,
   onDeleted,
+  readOnly = false,
 }: {
   kind: ItemKind;
   item?: VaultItem;
@@ -279,6 +288,7 @@ function ItemEditor({
   onKindChange: (kind: ItemKind) => void;
   onCreated: (id: string) => void;
   onDeleted: () => void;
+  readOnly?: boolean;
 }) {
   const def = ITEM_KINDS[kind];
   const find = findField(kind);
@@ -356,7 +366,7 @@ function ItemEditor({
 
       {result.error && <Alert tone="danger" className="mb-5">{result.error}</Alert>}
 
-      <div className="space-y-5">
+      <fieldset disabled={readOnly} className="space-y-5">
         <div className={cx("grid gap-4", find && "sm:grid-cols-2")}>
           <label className="block space-y-1.5">
             <span className="block text-sm font-medium text-stone-700">{def.title.label}</span>
@@ -437,9 +447,9 @@ function ItemEditor({
             </div>
           )}
         </fieldset>
-      </div>
+      </fieldset>
 
-      <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-5">
+      {!readOnly && <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-5">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : item ? "Save changes" : "Add to vault"}
         </Button>
@@ -471,7 +481,7 @@ function ItemEditor({
             {deleting ? "Deleting…" : "Delete"}
           </Button>
         )}
-      </div>
+      </div>}
     </form>
   );
 }

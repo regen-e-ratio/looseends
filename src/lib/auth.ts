@@ -7,6 +7,8 @@ import { db, schema } from "@/db";
 import { hashToken, newToken } from "./crypto";
 import { LOGIN_TOKEN_MINUTES, SESSION_DAYS } from "./config";
 import { needsAutoCheckIn, recordActivity } from "./switch";
+import { accessLevel } from "./billing-rules";
+import type { User } from "@/db/schema";
 
 const COOKIE = "le_session";
 const { users, sessions, loginTokens } = schema;
@@ -95,5 +97,20 @@ export const getCurrentUser = cache(async () => {
 export async function requireUser() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  return user;
+}
+
+/** Where a signed-in user belongs: subscribe first, then the guided setup, then the dashboard. */
+export function startPage(user: User): string {
+  const access = accessLevel(user);
+  if (access === "none") return "/subscribe";
+  if (!user.onboardedAt) return access === "member" ? "/onboarding" : "/subscribe";
+  return "/dashboard";
+}
+
+/** A signed-in user with a current subscription; everyone else goes to the subscribe page. */
+export async function requireMember() {
+  const user = await requireUser();
+  if (accessLevel(user) !== "member") redirect("/subscribe");
   return user;
 }

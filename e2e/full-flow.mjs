@@ -6,11 +6,13 @@ const { chromium } = createRequire(import.meta.url)("playwright"); // uses the g
 import { readFileSync, mkdirSync } from "node:fs";
 import postgres from "postgres";
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 
 const BASE = process.env.BASE_URL || "http://localhost:3000";
 const LOG = process.env.SERVER_LOG || "/tmp/server.log";
 const SHOTS = process.env.SHOTS || "/tmp/shots";
 const CRON_SECRET = process.env.CRON_SECRET;
+const PADDLE_SECRET = process.env.PADDLE_WEBHOOK_SECRET;
 mkdirSync(SHOTS, { recursive: true });
 const sql = postgres(process.env.DATABASE_URL);
 
@@ -39,6 +41,38 @@ async function cron() {
 }
 const step = (s) => console.log("•", s);
 
+/** Sends a Paddle webhook signed like Paddle does (Paddle-Signature: ts=…;h1=HMAC-SHA256("ts:body")). */
+async function paddleWebhook(event, secret = PADDLE_SECRET) {
+  const body = JSON.stringify(event);
+  const ts = Math.floor(Date.now() / 1000);
+  const h1 = createHmac("sha256", secret).update(`${ts}:${body}`).digest("hex");
+  return fetch(`${BASE}/api/paddle/webhook`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "paddle-signature": `ts=${ts};h1=${h1}` },
+    body,
+  });
+}
+let eventSeq = 0;
+/** A subscription event as Paddle sends it; `minutes` orders events in time (later = newer). */
+function subscriptionEvent(type, { id = "sub_e2ea", status, minutes, userId, cancel = false }) {
+  const at = (m) => new Date(Date.UTC(2026, 10, 4, 12, m)).toISOString();
+  return {
+    event_id: `evt_e2e${++eventSeq}`,
+    event_type: type,
+    occurred_at: at(minutes),
+    data: {
+      id,
+      status,
+      customer_id: "ctm_e2e",
+      updated_at: at(minutes),
+      current_billing_period: { starts_at: at(0), ends_at: "2027-11-04T12:00:00.000000Z" },
+      scheduled_change: cancel ? { action: "cancel", effective_at: "2027-11-04T12:00:00.000000Z", resume_at: null } : null,
+      custom_data: userId ? { userId } : null,
+      items: [{ price: { id: "pri_e2e" }, quantity: 1 }],
+    },
+  };
+}
+
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 page.on("pageerror", (e) => console.error("PAGE ERROR", e));
@@ -65,7 +99,10 @@ try {
   assert.equal((await fetch(`${BASE}/for/crypto`)).headers.get("x-robots-tag"), null, "ad pages indexable");
   assert.match((await fetch(`${BASE}/login`)).headers.get("x-robots-tag") ?? "", /noindex/);
   await page.goto(BASE);
-  await page.getByRole("link", { name: "Create your free vault" }).first().waitFor();
+  await page.getByRole("link", { name: "Start your vault" }).first().waitFor();
+  await page.getByText("One plan. Everything included.").waitFor();
+  for (const path of ["/terms", "/privacy", "/refunds"]) assert.equal((await fetch(`${BASE}${path}`)).status, 200, path);
+  assert.match(await (await fetch(`${BASE}/terms`)).text(), /Paddle\.com is the Merchant of Record/);
   await shot("01-landing");
 
   step("arrive from a crypto ad → homepage → sign up");
@@ -75,7 +112,7 @@ try {
   await page.locator("main a[href^='/?']").first().click();
   await page.waitForURL(/\/\?from=crypto&utm_source=e2e&utm_campaign=launch$/);
   await page.waitForFunction(() => document.querySelector('a[href^="/login?from=crypto"][href*="utm_campaign=launch"]'));
-  await page.getByRole("link", { name: "Create your free vault" }).first().click();
+  await page.getByRole("link", { name: "Start your vault" }).first().click();
   await page.waitForURL(/\/login\?from=crypto/);
 
   step("request login link");
@@ -89,10 +126,34 @@ try {
   await page.goto(loginLink);
   await page.goto(loginLink); // simulate scanner prefetch + real click
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.waitForURL("**/onboarding");
-  const [attr] = await sql`select signup_source, signup_campaign from users where email=${owner}`;
+  await page.waitForURL("**/subscribe");
+  const [attr] = await sql`select id, signup_source, signup_campaign from users where email=${owner}`;
   assert.equal(attr.signup_source, "crypto");
   assert.equal(attr.signup_campaign, "utm_source=e2e&utm_campaign=launch");
+  const ownerId = attr.id;
+
+  step("no subscription → only the subscribe page");
+  await page.getByRole("heading", { name: "Start your vault" }).waitFor();
+  assert.match(await page.getByTestId("plan-price").innerText(), /€39/);
+  await shot("02b-subscribe");
+  for (const path of ["/dashboard", "/onboarding", "/vault", "/contacts/new"]) {
+    await page.goto(`${BASE}${path}`);
+    await page.waitForURL("**/subscribe");
+  }
+  assert.match((await fetch(`${BASE}/subscribe`, { redirect: "manual" })).headers.get("content-security-policy") ?? "", /frame-src https:\/\/buy\.paddle\.com/);
+  assert.doesNotMatch((await fetch(`${BASE}/login`)).headers.get("content-security-policy") ?? "", /paddle/, "Paddle only on /subscribe");
+
+  step("Paddle webhooks: signature required");
+  const created = subscriptionEvent("subscription.created", { status: "active", minutes: 1, userId: ownerId });
+  assert.equal((await fetch(`${BASE}/api/paddle/webhook`, { method: "POST", body: JSON.stringify(created) })).status, 401);
+  assert.equal((await paddleWebhook(created, "wrong-secret")).status, 401);
+  assert.equal((await sql`select billing_status from users where id=${ownerId}`)[0].billing_status, "none");
+
+  step("subscription.created → access, then onboarding");
+  assert.equal((await paddleWebhook(created)).status, 200);
+  assert.equal((await paddleWebhook(created)).status, 200, "a repeated event is harmless");
+  await page.goto(`${BASE}/subscribe`);
+  await page.waitForURL("**/onboarding");
 
   step("onboarding is required for new users; crypto ad → wallet suggestions");
   await page.goto(`${BASE}/dashboard`);
@@ -457,6 +518,51 @@ try {
   const anon = await browser.newPage();
   await anon.goto(`${BASE}/dashboard`);
   assert.ok(anon.url().endsWith("/login"));
+
+  step("subscription ends → vault read-only, release switch keeps running");
+  await page.goto(`${BASE}/settings`);
+  await page.getByText(/Renews on 4 November 2027/).waitFor();
+  assert.equal((await paddleWebhook(subscriptionEvent("subscription.canceled", { status: "canceled", minutes: 10, userId: ownerId }))).status, 200);
+  await page.goto(`${BASE}/vault`);
+  await page.getByText("Your subscription has ended, so your vault is read-only").waitFor();
+  assert.equal(await page.getByRole("button", { name: "+ Add" }).count(), 0, "no adding when lapsed");
+  await page.locator("aside nav button").first().click();
+  assert.equal(await page.locator("textarea[name=notes]").isDisabled(), true, "fields are read-only");
+  assert.equal(await page.getByRole("button", { name: "Save changes" }).count(), 0);
+  await shot("19-frozen-vault");
+  await page.goto(`${BASE}/contacts`);
+  assert.equal(await page.getByRole("link", { name: "+ Add contact" }).count(), 0);
+  await page.goto(`${BASE}/contacts/new`);
+  await page.waitForURL("**/subscribe");
+  await page.getByRole("heading", { name: "Your subscription has ended" }).waitFor();
+  assert.equal((await sql`select switch_enabled from users where id=${ownerId}`)[0].switch_enabled, true, "switch still on");
+  await page.goto(`${BASE}/settings`);
+  await page.getByText("It keeps running while your subscription is inactive").waitFor();
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Turn off the switch" }).click();
+  await page.getByText("Your release switch is off.").waitFor();
+  assert.equal((await sql`select switch_enabled from users where id=${ownerId}`)[0].switch_enabled, false);
+
+  step("late webhooks are ignored; renewing (new subscription) restores access");
+  await paddleWebhook(subscriptionEvent("subscription.updated", { status: "active", minutes: 5, userId: ownerId }));
+  assert.equal((await sql`select billing_status from users where id=${ownerId}`)[0].billing_status, "canceled", "older event ignored");
+  const renewed = { id: "sub_e2eb", status: "active", minutes: 20 }; // no custom data: found by customer id
+  assert.equal((await paddleWebhook(subscriptionEvent("subscription.created", renewed))).status, 200);
+  await paddleWebhook(subscriptionEvent("subscription.updated", { status: "canceled", minutes: 30, userId: ownerId }));
+  assert.equal((await sql`select billing_status from users where id=${ownerId}`)[0].billing_status, "active", "the old subscription ending doesn't remove access");
+  await page.goto(`${BASE}/vault`);
+  await page.getByRole("button", { name: "+ Add" }).waitFor();
+  await page.goto(`${BASE}/settings`);
+  await paddleWebhook(subscriptionEvent("subscription.updated", { ...renewed, minutes: 40, cancel: true }));
+  await page.reload();
+  await page.getByText("Your subscription ends on 4 November 2027").waitFor();
+
+  step("deleting an account must cancel billing first");
+  await page.getByLabel(/Type "DELETE"/).fill("DELETE");
+  await page.getByRole("button", { name: "Delete my account" }).click();
+  await page.getByText("We couldn't cancel your subscription just now").waitFor(); // fake Paddle API key in tests
+  assert.equal((await sql`select count(*)::int as n from users where id=${ownerId}`)[0].n, 1, "nothing deleted");
+  await paddleWebhook(subscriptionEvent("subscription.canceled", { ...renewed, status: "canceled", minutes: 50 }));
 
   step("delete account");
   await page.goto(`${BASE}/settings`);

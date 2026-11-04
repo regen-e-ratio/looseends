@@ -11,8 +11,9 @@ You only do this once. After that, every change pushed to the `main` branch on G
 | Database | **Neon Postgres**, added *through* Vercel | Free tier | One click inside Vercel. It creates the database and sets `DATABASE_URL` for you |
 | Email | **Resend** | Free tier (about 3,000 emails/month) | Simplest API, good deliverability, and its dashboard shows every email sent |
 | Email domain | Any domain you own (we use `looseends.life`) | About $10/year | **Required by Resend to email anyone other than yourself.** Contacts must receive emails from a real domain or the emails land in spam |
+| Payments | **Paddle** (merchant of record) | No monthly fee; 5% + $0.50 per payment | Paddle sells to your customers on your behalf: it charges cards, and calculates, collects and files **EU VAT and US sales tax** for you, sends invoices and handles refunds and chargebacks. Stripe is cheaper per payment but leaves tax registration and filing in every EU country and US state to you |
 
-> ⚠️ Vercel's free Hobby plan is for **personal, non-commercial** use. If you start charging users, upgrade to Pro ($20/month). No code changes are needed.
+> ⚠️ Vercel's free Hobby plan is for **personal, non-commercial** use. Upgrade to Pro ($20/month) before you start charging (Step 7). No code changes are needed.
 
 ---
 
@@ -65,6 +66,51 @@ Project → **Settings → Domains** → add `yourdomain.com` (or `app.yourdomai
 2. Open the site, sign up with your email, and click the link you receive.
 3. Go to **Check-in & settings** → **Send me a test reminder email**.
 4. In Vercel → **Settings → Cron Jobs**, you should see `/api/cron/check-switches` scheduled daily.
+
+## Step 7: Payments with Paddle
+Every account needs a subscription. Until the four `PADDLE_*` variables below are set, the subscribe page says "Subscriptions open very soon" and nobody can get past it.
+
+### 7a. Test with Paddle's sandbox (about 20 minutes, no approval needed)
+The sandbox is a separate Paddle account where nothing is real: test cards, no money.
+
+1. Sign up at https://sandbox-login.paddle.com/signup.
+2. **Tax settings:** Paddle → *Business account* → *Tax* (or *Checkout settings*): set the default tax mode to **based on location**. EU customers then see prices with VAT included (€39 means €39), and US customers see sales tax added at checkout, as each expects.
+3. **Product and price:** *Catalog → Products → New product*
+   - Name: `Loose Ends` · Tax category: **Standard digital goods** (or **SaaS** if offered)
+   - *New price*: Billing **yearly** (every 1 year) · Base price **EUR 39.00** · Tax mode **Account setting** · no trial (optional: add one; trials work too)
+   - *Price overrides → add country*: **United States → USD 39.00**
+   - Save and copy the price ID (`pri_…`).
+4. **Default payment link:** *Checkout → Checkout settings → Default payment link* = `https://www.looseends.life/subscribe`.
+5. **API key:** *Developer tools → Authentication → API keys → New API key*.
+   - Permissions: read & write for **Subscriptions**, **Customers** and **Customer portal sessions**; read for **Transactions**.
+   - Expiry: choose the **longest** option and put the expiry date in your calendar. When the key expires, the "Manage subscription" button and cancelling on account deletion stop working until you replace it (payments and webhooks keep working).
+   - Copy the key (`pdl_sdbx_apikey_…`).
+6. **Client-side token:** same page → *Client-side tokens → New* → copy it (`test_…`).
+7. **Webhook:** *Developer tools → Notifications → New destination*
+   - URL: `https://www.looseends.life/api/paddle/webhook` (the `www.` address: the bare domain redirects, and webhooks don't follow redirects)
+   - Events: all **subscription.\*** events (created, updated, activated, canceled, past_due, paused, resumed, trialing) and **transaction.completed**
+   - Save, then copy the **secret key** (`pdl_ntfset_…`).
+8. **Vercel → Settings → Environment Variables** (Production), then **Redeploy**:
+
+   | Name | Value |
+   |---|---|
+   | `PADDLE_CLIENT_TOKEN` | the `test_…` client-side token |
+   | `PADDLE_API_KEY` | the API key |
+   | `PADDLE_PRICE_ID` | the `pri_…` price ID |
+   | `PADDLE_WEBHOOK_SECRET` | the notification secret key |
+   | `LEGAL_NAME` | your name or company name, shown on the terms and privacy pages |
+   | `LEGAL_ADDRESS` | your business address (required in the EU for the privacy notice) |
+   | `SUPPORT_EMAIL` | an address you read (defaults to `support@looseends.life`, which only works if you set up forwarding for it) |
+
+9. **Test:** `/api/health` shows `"payments": "sandbox"`. Sign up with a new email and pay with card **4242 4242 4242 4242**, any future expiry date, any CVC. You should land in onboarding within a few seconds. In *Settings → Manage subscription* you can see the invoice and cancel; Settings then says when it ends.
+
+### 7b. Go live (Paddle reviews your account; usually a few days)
+1. Upgrade Vercel to **Pro** (commercial use) and Resend to **Pro** when you expect more than 100 emails a day.
+2. Sign up for a live account at https://login.paddle.com/signup and complete **verification**: business details, identity, and the bank account for payouts.
+3. **Website approval:** *Checkout → Website approval* → add `looseends.life`. Paddle checks the site; everything it looks for is already live: the product description (homepage), **pricing** (`/#pricing`), **terms** naming Paddle as merchant of record (`/terms`), a **refund policy** (`/refunds`), a **privacy notice** (`/privacy`) and a contact email. Have a lawyer review those three pages: they are good drafts, not legal advice.
+4. Repeat 7a steps 2–7 in the **live** dashboard (all IDs and keys are different).
+5. In Vercel, replace the four `PADDLE_*` values with the live ones (the client token starts with `live_`) and redeploy. `/api/health` now shows `"payments": "production"`.
+6. Buy a subscription with your own card, then refund yourself in Paddle (*Transactions → the payment → Refund*).
 
 That's it. 🎉
 

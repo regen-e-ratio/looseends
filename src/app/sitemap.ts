@@ -4,5 +4,5 @@ import { AUDIENCES } from "@/marketing";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = appUrl();
-  return [{ url: base }, ...AUDIENCES.map((a) => ({ url: `${base}/for/${a.slug}` }))];
+  return [{ url: base }, ...["terms", "privacy", "refunds"].map((p) => ({ url: `${base}/${p}` })), ...AUDIENCES.map((a) => ({ url: `${base}/for/${a.slug}` }))];
 }

@@ -17,3 +17,28 @@ export function reminderEveryDays(gracePeriodDays: number): number {
 
 export const INTERVAL_OPTIONS = [7, 14, 30, 60, 90, 180] as const;
 export const GRACE_OPTIONS = [3, 7, 14, 30] as const;
+
+/**
+ * The one plan, as the website describes it. Prices are charged by Paddle (see SETUP.md): keep these in sync
+ * with the price in Paddle. EU prices include VAT; US sales tax is added at checkout.
+ */
+export const PLAN = {
+  eur: "€39",
+  usd: "$39",
+  period: "year",
+  includes: [
+    "Unlimited accounts, subscriptions, wallets and messages",
+    "Unlimited trusted contacts",
+    "Check-in reminders, or let your contacts claim",
+    "Encrypted, private, never sold or shared",
+  ],
+  refundDays: 14,
+} as const;
+
+export const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@looseends.life";
+
+/** Who runs Loose Ends, as shown on the legal pages (set LEGAL_NAME and LEGAL_ADDRESS in Vercel). */
+export const OPERATOR = {
+  name: process.env.LEGAL_NAME || "",
+  address: process.env.LEGAL_ADDRESS || "",
+};

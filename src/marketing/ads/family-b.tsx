@@ -14,7 +14,7 @@ function GoldenHour({ from }: AdProps) {
     <AdFrame
       logo={{ bg: "#FFF7EC", fg: "#8A3B4E", text: "#FFF7EC" }}
       style={{ background: "linear-gradient(160deg, #F2B880 0%, #E58C76 45%, #A8506A 100%)", color: "#FFF7EC" }}
-      footer="Free · Private and encrypted · Easy to use, at your own pace"
+      footer="€39 a year · Private and encrypted · Easy to use, at your own pace"
     >
       <div
         className="pointer-events-none absolute -top-40 right-[-10%] -z-10 h-[38rem] w-[38rem] rounded-full opacity-60 blur-3xl"
@@ -42,7 +42,7 @@ function GoldenHour({ from }: AdProps) {
           when the time comes.
         </p>
         <AdCta from={from} className="mt-8 rounded-full bg-white shadow-xl hover:bg-[#FFF3E2]" style={{ color: "#7A2E3B" }}>
-          Start your letters — it&apos;s free
+          Start your letters
         </AdCta>
       </div>
     </AdFrame>

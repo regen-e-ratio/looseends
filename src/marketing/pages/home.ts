@@ -13,8 +13,8 @@ export const home: LandingPage = {
     headline: "So the people you love aren't left untangling them.",
     subheadline:
       "If something happened to you tomorrow, would anyone know about your bank accounts, investments, subscriptions or last wishes? Loose Ends is a private place to write them down. If you stop checking in, we pass them on to the people you chose — and only them.",
-    cta: "Create your free vault",
-    bullets: ["Free to use", "Encrypted", "No passwords stored"],
+    cta: "Start your vault",
+    bullets: ["Everything included", "Encrypted", "No passwords stored"],
   },
   preview: {
     ownerName: "Alex",
@@ -47,6 +47,6 @@ export const home: LandingPage = {
   closing: {
     headline: "Fifteen minutes now saves them months later.",
     body: "Start with the three things that would be hardest for your family to find.",
-    cta: "Create your free vault",
+    cta: "Start your vault",
   },
 };

@@ -44,7 +44,21 @@ export const users = pgTable("users", {
   claimRecipientId: uuid("claim_recipient_id"),
   /** encrypted one-click "I'm OK" token included in reminder emails (stable for one warning period) */
   checkInToken: text("check_in_token"),
+
+  // Subscription (Paddle is the merchant of record; see src/lib/billing.ts). Written only from Paddle's data.
+  /** none = never subscribed. Otherwise Paddle's subscription status. */
+  billingStatus: text("billing_status").$type<BillingStatus>().notNull().default("none"),
+  billingCustomerId: text("billing_customer_id"),
+  billingSubscriptionId: text("billing_subscription_id"),
+  /** End of the period that has been paid for (the next renewal date while active). */
+  billingPeriodEndsAt: tz("billing_period_ends_at"),
+  /** Set when the subscription is scheduled to end (the user cancelled; it runs until this date). */
+  billingCancelsAt: tz("billing_cancels_at"),
+  /** Paddle's updated_at of the subscription state stored here. Older data (late webhooks) is ignored. */
+  billingUpdatedAt: tz("billing_updated_at"),
 });
+
+export type BillingStatus = "none" | "active" | "trialing" | "past_due" | "paused" | "canceled";
 
 export const sessions = pgTable(
   "sessions",

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { consumeLoginToken, createLoginToken, endSession, normalizeEmail, startSession } from "@/lib/auth";
+import { consumeLoginToken, createLoginToken, endSession, normalizeEmail, startSession, startPage } from "@/lib/auth";
 import { appUrl } from "@/lib/config";
 import { loginEmail, sendEmail } from "@/lib/email";
 import { recordActivity } from "@/lib/switch";
@@ -64,7 +64,7 @@ export async function verifyLoginAction(formData: FormData) {
   // Signing in proves you're alive (check-in mode). It never cancels a pending claim or a release.
   await recordActivity(user);
   await startSession(user.id);
-  redirect(user.onboardedAt ? "/dashboard" : "/onboarding");
+  redirect(startPage(user));
 }
 
 export async function logoutAction() {

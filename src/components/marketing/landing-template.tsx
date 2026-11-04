@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { LandingPage } from "@/marketing/types";
 import { DEFAULT_STEPS, SHARED_FAQ } from "@/marketing/shared";
-import { APP_NAME } from "@/lib/config";
+import { APP_NAME, PLAN, SUPPORT_EMAIL } from "@/lib/config";
 import { Logo } from "../logo";
 import { CtaLink } from "./cta-link";
 import { PreviewCard } from "./preview-card";
@@ -109,6 +109,48 @@ export function LandingTemplate({ page, signedIn = false }: { page: LandingPage;
           </div>
         </section>
 
+        {/* Pricing */}
+        <section id="pricing" className="scroll-mt-8 border-b border-stone-200">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:py-20 lg:grid-cols-2">
+            <div>
+              <h2 className="text-3xl font-semibold tracking-tight">One plan. Everything included.</h2>
+              <p className="mt-3 max-w-xl text-lg text-stone-600">
+                No tiers and no limits. Cancel anytime — and if a payment ever fails after you&apos;re gone, your instructions are still
+                delivered.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+              <p className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-4xl font-semibold tracking-tight">{PLAN.eur}</span>
+                <span className="text-stone-500">per {PLAN.period}</span>
+                <span className="text-sm text-stone-500">· {PLAN.usd} in the US</span>
+              </p>
+              <p className="mt-1 text-sm text-stone-500">EU prices include VAT. US sales tax is added at checkout.</p>
+              <ul className="mt-5 space-y-2 text-stone-700">
+                {PLAN.includes.map((line) => (
+                  <li key={line} className="flex gap-2">
+                    <span aria-hidden className="text-teal-700">✓</span>
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6">
+                <CtaLink
+                  from={from}
+                  href={signedIn ? "/dashboard" : "/login"}
+                  forward={!signedIn}
+                  className={primary}
+                >
+                  {signedIn ? "Go to my vault" : page.closing.cta}
+                </CtaLink>
+              </div>
+              <p className="mt-4 text-xs text-stone-500">
+                {PLAN.refundDays}-day money-back guarantee. Payments are handled by Paddle, our merchant of record.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* FAQ */}
         <section className="mx-auto max-w-3xl px-4 py-16 sm:py-20">
           <h2 className="text-3xl font-semibold tracking-tight">Questions</h2>
@@ -145,7 +187,16 @@ export function LandingTemplate({ page, signedIn = false }: { page: LandingPage;
       </main>
 
       <footer className="border-t border-stone-200 py-8 text-center text-sm text-stone-500">
-        {APP_NAME} · Never store passwords or seed phrases — tell people <em>where</em> things are, not your secrets.
+        <p>
+          {APP_NAME} · Never store passwords or seed phrases — tell people <em>where</em> things are, not your secrets.
+        </p>
+        <nav className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-1" aria-label="Legal">
+          <Link href="/#pricing" className="hover:text-stone-800">Pricing</Link>
+          <Link href="/terms" className="hover:text-stone-800">Terms</Link>
+          <Link href="/privacy" className="hover:text-stone-800">Privacy</Link>
+          <Link href="/refunds" className="hover:text-stone-800">Refunds</Link>
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-stone-800">{SUPPORT_EMAIL}</a>
+        </nav>
       </footer>
     </div>
   );

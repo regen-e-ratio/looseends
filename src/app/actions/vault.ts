@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { requireUser } from "@/lib/auth";
+import { requireMember } from "@/lib/auth";
 import { isKind, itemInputSchema } from "@/lib/items";
 import { encodePayload } from "@/lib/vault";
 
@@ -18,7 +18,7 @@ export type SaveItemResult = FormState & { ok?: boolean; id?: string };
 
 /** Creates or updates one vault item. Called directly from the vault editor (no redirect). */
 export async function saveItemAction(formData: FormData): Promise<SaveItemResult> {
-  const user = await requireUser();
+  const user = await requireMember();
   const id = String(formData.get("id") ?? "") || null;
   const kind = formData.get("kind");
   if (!isKind(kind)) return { error: "Unknown item type." };
@@ -71,7 +71,7 @@ export async function saveItemAction(formData: FormData): Promise<SaveItemResult
 }
 
 export async function deleteItemAction(id: string): Promise<{ ok: boolean }> {
-  const user = await requireUser();
+  const user = await requireMember();
   await db.delete(items).where(and(eq(items.id, id), eq(items.userId, user.id)));
   revalidatePath("/vault");
   revalidatePath("/dashboard");

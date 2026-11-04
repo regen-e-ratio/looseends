@@ -19,7 +19,7 @@ function MoneyMap({ from }: AdProps) {
           "radial-gradient(60% 60% at 80% 30%, rgba(198,244,50,.16), transparent 70%), linear-gradient(#0B0F14, #0B0F14)",
         color: "#F4F7FA",
       }}
-      footer="Free · Takes 15 minutes · We never ask for logins"
+      footer="€39 a year · Takes 15 minutes · We never ask for logins"
     >
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07]"
@@ -35,7 +35,7 @@ function MoneyMap({ from }: AdProps) {
             Keep a private map of every account — and pass it on automatically to the people you choose if something happens to you.
           </p>
           <AdCta from={from} className="mt-8 rounded-xl bg-[#C6F432] font-bold text-[#0B0F14] hover:bg-[#D7FF5C]">
-            Map my accounts — free
+            Map my accounts
           </AdCta>
         </div>
 

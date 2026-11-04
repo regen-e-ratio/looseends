@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { normalizeEmail, requireUser } from "@/lib/auth";
+import { normalizeEmail, requireMember } from "@/lib/auth";
 import { GRACE_OPTIONS, INTERVAL_OPTIONS } from "@/lib/config";
 import { contactAddedEmail, sendEmail } from "@/lib/email";
 import { ONBOARDING_KINDS } from "@/lib/onboarding";
@@ -38,7 +38,7 @@ function parseJson(value: FormDataEntryValue | null): unknown {
 
 /** Phase 1: name, an optional message and quick-added subscriptions / accounts. */
 export async function saveStepOneAction(_prev: StepState, formData: FormData): Promise<StepState> {
-  const user = await requireUser();
+  const user = await requireMember();
   const parsed = stepOneSchema.safeParse({
     name: formData.get("name") ?? "",
     messageTitle: formData.get("messageTitle") ?? "",
@@ -81,7 +81,7 @@ const contactsSchema = z
 
 /** Phase 2: trusted contacts. No emails yet — what they receive depends on the mode chosen in phase 3. */
 export async function saveStepTwoAction(_prev: StepState, formData: FormData): Promise<StepState> {
-  const user = await requireUser();
+  const user = await requireMember();
   const parsed = contactsSchema.safeParse(parseJson(formData.get("contacts")));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please check the form." };
 
@@ -109,7 +109,7 @@ export async function saveStepTwoAction(_prev: StepState, formData: FormData): P
 
 /** Phase 3: choose how a release is triggered, switch it on (when there are contacts) and finish. */
 export async function finishOnboardingAction(_prev: StepState, formData: FormData): Promise<StepState> {
-  const user = await requireUser();
+  const user = await requireMember();
   const mode = formData.get("mode") === "claim" ? "claim" : "checkin";
   const interval = Number(formData.get("interval"));
   const grace = Number(formData.get("grace"));
@@ -153,7 +153,7 @@ export async function finishOnboardingAction(_prev: StepState, formData: FormDat
 
 /** "Skip setup": never show onboarding again; the dashboard checklist takes over. */
 export async function skipOnboardingAction() {
-  const user = await requireUser();
+  const user = await requireMember();
   await db.update(users).set({ onboardedAt: new Date() }).where(eq(users.id, user.id));
   redirect("/dashboard");
 }

@@ -63,11 +63,22 @@ await check("cron endpoint rejects missing and wrong secrets", async () => {
 });
 
 await check("private pages redirect anonymous visitors to /login", async () => {
-  for (const p of ["/dashboard", "/contacts", "/contacts/new", "/settings", "/vault", "/onboarding"]) {
+  for (const p of ["/dashboard", "/contacts", "/contacts/new", "/settings", "/vault", "/onboarding", "/subscribe"]) {
     const r = await get(p);
     assert.ok([302, 303, 307].includes(r.status), `${p} → ${r.status}`);
     assert.match(r.headers.get("location") ?? "", /\/login$/, p);
   }
+});
+
+await check("pricing and the legal pages Paddle requires are public", async () => {
+  assert.match(await (await get("/")).text(), /One plan\. Everything included\./);
+  for (const p of ["/terms", "/privacy", "/refunds"]) assert.equal((await get(p)).status, 200, p);
+  assert.match(await (await get("/terms")).text(), /Paddle\.com is the Merchant of Record/);
+});
+
+await check("Paddle webhook rejects unsigned requests", async () => {
+  const r = await get("/api/paddle/webhook", { method: "POST", body: "{}" });
+  assert.ok([401, 503].includes(r.status), `status ${r.status}`); // 503 = payments not configured yet
 });
 
 await check("Vercel Web Analytics is enabled for the project", async () => {
@@ -92,7 +103,7 @@ await check("ad click → homepage → sign-up keeps attribution", async () => {
   await page.locator("main a[href^='/?']").first().click();
   await page.waitForURL(/\/\?from=crypto/);
   await page.waitForFunction(() => document.querySelector('a[href^="/login?from=crypto"][href*="utm_campaign=test"]'));
-  await page.getByRole("link", { name: "Create your free vault" }).first().click();
+  await page.getByRole("link", { name: "Start your vault" }).first().click();
   await page.waitForURL(/\/login\?from=crypto/);
 });
 

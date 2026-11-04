@@ -10,9 +10,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.mjs",
     "typecheck": "next typegen && tsc --noEmit",
-    "test:unit": "tsx src/components/analytics.test.ts && tsx src/lib/switch-rules.test.ts"
+    "test:unit": "tsx src/components/analytics.test.ts && tsx src/lib/switch-rules.test.ts && tsx src/lib/billing-rules.test.ts"
   },
   "dependencies": {
+    "@paddle/paddle-js": "1.6.6",
     "@vercel/analytics": "^2.0.1",
     "drizzle-orm": "^0.45.4",
     "next": "16.4.3",

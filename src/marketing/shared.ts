@@ -1,3 +1,4 @@
+import { PLAN } from "@/lib/config";
 import type { LandingPage } from "./types";
 
 export const DEFAULT_STEPS: NonNullable<LandingPage["steps"]> = [
@@ -20,5 +21,12 @@ export const SHARED_FAQ: LandingPage["faq"] = [
     q: "Is my information safe?",
     a: "Everything you write is encrypted before it's stored, and each contact can only see what you chose to share with them. We never ask for passwords, PINs or seed phrases — and we tell you not to write them down here.",
   },
-  { q: "How much does it cost?", a: "Loose Ends is free to use right now. No card needed." },
+  {
+    q: "How much does it cost?",
+    a: `${PLAN.eur} a ${PLAN.period} in Europe (VAT included) or ${PLAN.usd} a ${PLAN.period} in the US (plus sales tax). One plan with everything, no limits. Cancel anytime, and ask for a full refund within ${PLAN.refundDays} days if it's not for you.`,
+  },
+  {
+    q: "What happens if my payments stop?",
+    a: "Your vault becomes read-only, but your release switch keeps working with the settings you chose. If your card stops working because you're gone, your instructions still reach your people. We never charge your contacts anything.",
+  },
 ];

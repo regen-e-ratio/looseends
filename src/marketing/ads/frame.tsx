@@ -13,7 +13,7 @@ export function AdFrame({
   className,
   style,
   logo,
-  footer = "Free · Encrypted · We never ask for passwords",
+  footer = "€39 a year · Encrypted · We never ask for passwords",
   children,
 }: {
   className?: string;

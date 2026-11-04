@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { endSession, requireUser } from "@/lib/auth";
+import { endSession, requireMember, requireUser } from "@/lib/auth";
 import {
   confirmAlive,
   isClaimPending,
@@ -18,12 +18,13 @@ import { GRACE_OPTIONS, INTERVAL_OPTIONS } from "@/lib/config";
 import type { FormState } from "./vault";
 import { assertUserEmailAllowed, RateLimited } from "@/lib/rate-limit";
 import { oneLineName } from "@/lib/validation";
+import { cancelSubscriptionNow } from "@/lib/billing";
 
 const { users, recipients } = schema;
 
 
 export async function saveNameAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const user = await requireUser();
+  const user = await requireMember();
   const name = oneLineName().safeParse(formData.get("name") ?? "");
   if (!name.success) return { fieldErrors: { name: ["Please enter your name."] } };
   await db.update(users).set({ name: name.data }).where(eq(users.id, user.id));
@@ -34,7 +35,7 @@ export async function saveNameAction(_prev: FormState, formData: FormData): Prom
 export type SwitchFormState = FormState & { ok?: boolean; message?: string };
 
 export async function saveSwitchAction(_prev: SwitchFormState, formData: FormData): Promise<SwitchFormState> {
-  const user = await requireUser();
+  const user = await requireMember();
   const enabled = formData.get("enabled") === "on";
   const mode = formData.get("mode") === "claim" ? "claim" : "checkin";
   const interval = Number(formData.get("interval"));
@@ -69,8 +70,21 @@ export async function saveSwitchAction(_prev: SwitchFormState, formData: FormDat
   return { ok: true, message };
 }
 
-export async function sendTestReminderAction(): Promise<SwitchFormState> {
+/**
+ * Turns the release switch off. Works without a subscription too: a lapsed account keeps its switch running,
+ * and its owner must always be able to stop it.
+ */
+export async function turnOffSwitchAction() {
   const user = await requireUser();
+  if (isClaimPending(user)) await confirmAlive(user.id);
+  const [saved] = await db.update(users).set({ switchEnabled: false }).where(eq(users.id, user.id)).returning();
+  if (saved) await restartSchedule(saved);
+  revalidatePath("/", "layout");
+  redirect("/settings?switchOff=1");
+}
+
+export async function sendTestReminderAction(): Promise<SwitchFormState> {
+  const user = await requireMember();
   try {
     await assertUserEmailAllowed(user.id);
     await sendReminder(user, { test: true });
@@ -99,6 +113,15 @@ export async function resetAfterReleaseAction() {
 export async function deleteAccountAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   if (String(formData.get("confirm") ?? "").trim() !== "DELETE") return { error: 'Type DELETE to confirm.' };
+  // Stop billing first: an account that no longer exists must never be charged again.
+  if (user.billingSubscriptionId && user.billingStatus !== "canceled") {
+    try {
+      await cancelSubscriptionNow(user.billingSubscriptionId);
+    } catch (err) {
+      console.error("cancel on delete", err);
+      return { error: "We couldn't cancel your subscription just now, so nothing was deleted. Please try again in a few minutes." };
+    }
+  }
   await db.delete(users).where(eq(users.id, user.id));
   await db.delete(schema.loginTokens).where(eq(schema.loginTokens.email, user.email));
   await endSession();

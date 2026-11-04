@@ -14,7 +14,7 @@ export type LandingPage = {
     headline: string;
     subheadline: string;
     cta: string;
-    /** Short reassurance points under the button, e.g. "Free to use". */
+    /** Short reassurance points under the button, e.g. "Encrypted". */
     bullets: string[];
   };
   /** Mock of what a trusted contact would receive — the hero visual. Use generic names, no real brands. */

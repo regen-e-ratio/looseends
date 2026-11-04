@@ -2,12 +2,16 @@ import { logoutAction } from "@/app/actions/auth";
 import { Logo } from "@/components/logo";
 import { NavLinks } from "@/components/nav-links";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import Link from "next/link";
+import { requireUser, startPage } from "@/lib/auth";
+import { accessLevel } from "@/lib/billing";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
-  // First-time users go through the guided setup before anything else.
-  if (!user.onboardedAt) redirect("/onboarding");
+  // Subscribe first, then the guided setup, then the app. Lapsed accounts stay in, read-only.
+  const start = startPage(user);
+  if (start !== "/dashboard") redirect(start);
+  const access = accessLevel(user);
   return (
     <div className="flex flex-1 flex-col">
       <header className="no-print border-b border-stone-200 bg-white">
@@ -22,6 +26,22 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </div>
         </div>
       </header>
+      {access === "frozen" && (
+        <div className="no-print border-b border-amber-200 bg-amber-50 text-sm text-amber-900">
+          <p className="mx-auto max-w-5xl px-4 py-2.5">
+            Your subscription has ended, so your vault is read-only. Your release switch keeps running.{" "}
+            <a href="/subscribe" className="font-medium underline">Renew</a>
+          </p>
+        </div>
+      )}
+      {user.billingStatus === "past_due" && (
+        <div className="no-print border-b border-amber-200 bg-amber-50 text-sm text-amber-900">
+          <p className="mx-auto max-w-5xl px-4 py-2.5">
+            We couldn&apos;t take your last payment.{" "}
+            <Link href="/settings" className="font-medium underline">Check your payment method</Link>
+          </p>
+        </div>
+      )}
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
     </div>
   );

@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/ui";
 import { VaultEditor } from "@/components/vault/vault-editor";
 import { requireUser } from "@/lib/auth";
 import { listItems, listRecipients } from "@/lib/vault";
+import { accessLevel } from "@/lib/billing";
 
 export const metadata = { title: "My vault" };
 
@@ -12,7 +13,7 @@ export default async function VaultPage() {
   return (
     <div>
       <PageHeader title="My vault" description="Everything you've written down for your people." />
-      <VaultEditor items={items} contacts={contacts.map(({ id, name }) => ({ id, name }))} />
+      <VaultEditor items={items} contacts={contacts.map(({ id, name }) => ({ id, name }))} readOnly={accessLevel(user) !== "member"} />
     </div>
   );
 }
