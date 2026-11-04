@@ -1,10 +1,10 @@
 import "server-only";
 import { timingSafeEqual } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, exists, isNull, lt, lte, ne, not, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Recipient, User } from "@/db/schema";
 import { decrypt, encrypt, hashToken, newToken } from "./crypto";
-import { appUrl, reminderEveryDays } from "./config";
+import { appUrl } from "./config";
 import {
   claimInviteEmail,
   claimPendingEmail,
@@ -14,41 +14,33 @@ import {
   reminderEmail,
   sendEmail,
 } from "./email";
+import { LIMITS, allow, assertUserEmailAllowed } from "./rate-limit";
+import { DAY, SLACK_MS, evaluateSwitch, isClaimPending, releaseDate, type SwitchAction } from "./switch-rules";
 
-const { users, recipients } = schema;
-const DAY = 86_400_000;
+export * from "./switch-rules";
 
-export type SwitchAction = "none" | "start_warning" | "remind" | "trigger" | "release_pending";
+const { users, recipients, loginTokens, sessions, rateLimits, jobLeases } = schema;
 
-export function nextCheckInDue(u: Pick<User, "lastCheckInAt" | "checkInIntervalDays">): Date {
-  return new Date(u.lastCheckInAt.getTime() + u.checkInIntervalDays * DAY);
-}
+const RESET = {
+  switchStatus: "active",
+  warningStartedAt: null,
+  lastReminderAt: null,
+  checkInToken: null,
+  claimRecipientId: null,
+} as const;
 
 /**
- * When the vault will be released if nobody stops it. While a warning/claim is pending this is
- * its start + grace period; otherwise (check-in mode) the next due date + grace period.
+ * Only update the row if it is still in the warning period we read (compare-and-set). Compared at
+ * millisecond precision: that's what we read back into JavaScript, while Postgres may store microseconds.
  */
-export function releaseDate(
-  u: Pick<User, "lastCheckInAt" | "checkInIntervalDays" | "gracePeriodDays" | "warningStartedAt" | "switchStatus" | "switchMode">,
-): Date {
-  const start =
-    u.switchStatus === "warning" && u.warningStartedAt ? u.warningStartedAt : u.switchMode === "claim" ? new Date() : nextCheckInDue(u);
-  return new Date(start.getTime() + u.gracePeriodDays * DAY);
-}
-
-/** Pure decision function — easy to reason about and test. */
-export function evaluateSwitch(u: User, now: Date): SwitchAction {
-  if (!u.switchEnabled) return "none";
-  if (u.switchStatus === "triggered") return "release_pending";
-  if (u.switchStatus === "active") {
-    // Claim mode never starts on its own: only a trusted contact's request does (see startClaim).
-    if (u.switchMode === "claim") return "none";
-    return now >= nextCheckInDue(u) ? "start_warning" : "none";
-  }
-  // warning
-  if (now >= releaseDate(u)) return "trigger";
-  const last = u.lastReminderAt?.getTime() ?? 0;
-  return now.getTime() - last >= reminderEveryDays(u.gracePeriodDays) * DAY - 60 * 60_000 ? "remind" : "none";
+function sameWarning(u: User) {
+  return and(
+    eq(users.id, u.id),
+    eq(users.switchStatus, "warning"),
+    u.warningStartedAt
+      ? sql`date_trunc('milliseconds', ${users.warningStartedAt}) = ${u.warningStartedAt.toISOString()}::timestamptz`
+      : isNull(users.warningStartedAt),
+  );
 }
 
 async function recipientCount(userId: string): Promise<number> {
@@ -63,10 +55,11 @@ async function checkInToken(u: User): Promise<string> {
   return token;
 }
 
+/** Composes and sends the owner's reminder (a check-in reminder, or a pending-claim notice). Throws on failure. */
 export async function sendReminder(u: User, opts: { test?: boolean } = {}): Promise<void> {
   const token = await checkInToken(u);
   const link = `${appUrl()}/check-in?u=${u.id}&t=${token}`;
-  if (u.switchMode === "claim" && u.switchStatus === "warning" && u.claimRecipientId) {
+  if (isClaimPending(u) && u.claimRecipientId) {
     const claimant = await db.query.recipients.findFirst({ where: eq(recipients.id, u.claimRecipientId) });
     await sendEmail(
       claimPendingEmail({
@@ -75,7 +68,7 @@ export async function sendReminder(u: User, opts: { test?: boolean } = {}): Prom
         claimantName: claimant?.name ?? "A trusted contact",
         link,
         releaseDate: releaseDate(u),
-        reminder: Boolean(u.lastReminderAt && u.warningStartedAt && u.lastReminderAt > u.warningStartedAt),
+        reminder: Boolean(u.lastReminderAt),
       }),
     );
     return;
@@ -92,25 +85,25 @@ export async function sendReminder(u: User, opts: { test?: boolean } = {}): Prom
   );
 }
 
-const RESET = {
-  switchStatus: "active",
-  warningStartedAt: null,
-  lastReminderAt: null,
-  checkInToken: null,
-  claimRecipientId: null,
-} as const;
-
-/** Signed-in visits count as a check-in at most this often. */
-const AUTO_CHECK_IN_EVERY_MS = 60 * 60_000;
-
-export function isClaimPending(u: Pick<User, "switchMode" | "switchStatus" | "claimRecipientId">): boolean {
-  return u.switchMode === "claim" && u.switchStatus === "warning" && Boolean(u.claimRecipientId);
-}
-
-export function needsAutoCheckIn(u: User, now = new Date()): boolean {
-  if (u.switchStatus === "triggered") return false;
-  if (u.switchMode === "checkin" && u.switchStatus === "warning") return true;
-  return now.getTime() - u.lastCheckInAt.getTime() > AUTO_CHECK_IN_EVERY_MS;
+/**
+ * Sends the reminder for the current warning period and records it only once it was actually delivered.
+ * The first delivered reminder (re)starts the grace period, so after an email outage the owner still gets
+ * the full grace period from the first reminder that reached them.
+ */
+async function deliverReminder(u: User): Promise<boolean> {
+  const now = new Date();
+  const first = !u.lastReminderAt;
+  try {
+    await sendReminder(first ? { ...u, warningStartedAt: now } : u);
+  } catch (err) {
+    console.error(`reminder to user ${u.id} failed`, err);
+    return false;
+  }
+  await db
+    .update(users)
+    .set(first ? { lastReminderAt: now, warningStartedAt: now } : { lastReminderAt: now })
+    .where(sameWarning(u));
+  return true;
 }
 
 /**
@@ -119,16 +112,23 @@ export function needsAutoCheckIn(u: User, now = new Date()): boolean {
  * - claim mode: only records the visit. A pending claim is never cancelled implicitly — someone with
  *   access to the owner's signed-in device must not be able to block it; the owner rejects it explicitly.
  * Does nothing once the vault has been released (that needs resetAfterRelease).
+ * Both updates are conditional, so a claim that starts concurrently is never wiped.
  */
 export async function recordActivity(u: User): Promise<User> {
   if (u.switchStatus === "triggered") return u;
   const now = new Date();
-  const [updated] = await db
+  const [reset] = await db
     .update(users)
-    .set(isClaimPending(u) ? { lastCheckInAt: now } : { lastCheckInAt: now, ...RESET })
-    .where(eq(users.id, u.id))
+    .set({ lastCheckInAt: now, ...RESET })
+    .where(and(eq(users.id, u.id), ne(users.switchStatus, "triggered"), not(and(eq(users.switchMode, "claim"), eq(users.switchStatus, "warning"))!)))
     .returning();
-  return updated ?? u;
+  if (reset) return reset;
+  const [touched] = await db
+    .update(users)
+    .set({ lastCheckInAt: now })
+    .where(and(eq(users.id, u.id), ne(users.switchStatus, "triggered")))
+    .returning();
+  return touched ?? u;
 }
 
 /**
@@ -140,7 +140,12 @@ export async function confirmAlive(userId: string): Promise<"ok" | "rejected" | 
   if (!u) return "ok";
   if (u.switchStatus === "triggered") return "released";
   const claimantId = isClaimPending(u) ? u.claimRecipientId : null;
-  await db.update(users).set({ lastCheckInAt: new Date(), ...RESET }).where(eq(users.id, u.id));
+  const [updated] = await db
+    .update(users)
+    .set({ lastCheckInAt: new Date(), ...RESET })
+    .where(and(eq(users.id, u.id), ne(users.switchStatus, "triggered")))
+    .returning({ id: users.id });
+  if (!updated) return "released"; // released in the meantime
   if (!claimantId) return "ok";
   const claimant = await db.query.recipients.findFirst({ where: eq(recipients.id, claimantId) });
   if (claimant) {
@@ -162,7 +167,10 @@ export async function checkInWithToken(userId: string, token: string): Promise<"
 
 /** After a (false-alarm) release: revoke every access link and restart the timer. */
 export async function resetAfterRelease(userId: string): Promise<void> {
-  await db.update(recipients).set({ accessTokenHash: null, releasedAt: null }).where(eq(recipients.userId, userId));
+  await db
+    .update(recipients)
+    .set({ accessTokenHash: null, releasedAt: null, releaseAttemptAt: null })
+    .where(eq(recipients.userId, userId));
   await db.update(users).set({ triggeredAt: null, lastCheckInAt: new Date(), ...RESET }).where(eq(users.id, userId));
 }
 
@@ -179,10 +187,13 @@ export async function dropClaim(ownerId: string): Promise<void> {
 
 // ---------- claim mode ----------
 
-/** Emails a contact a fresh personal "request access" link (any previous link stops working). */
+/**
+ * Emails a contact a fresh personal "request access" link. The new link only replaces the old one once
+ * the email was sent, so a failed send never leaves the contact without a working link.
+ */
 export async function sendClaimInvite(owner: User, r: Recipient): Promise<void> {
+  await assertUserEmailAllowed(owner.id);
   const { token, hash } = newToken();
-  await db.update(recipients).set({ claimTokenHash: hash }).where(eq(recipients.id, r.id));
   await sendEmail(
     claimInviteEmail({
       to: r.email,
@@ -193,15 +204,16 @@ export async function sendClaimInvite(owner: User, r: Recipient): Promise<void> 
       waitDays: owner.gracePeriodDays,
     }),
   );
-  await db.update(recipients).set({ claimLinkSentAt: new Date(), notifiedAt: new Date() }).where(eq(recipients.id, r.id));
+  const now = new Date();
+  await db.update(recipients).set({ claimTokenHash: hash, claimLinkSentAt: now, notifiedAt: now }).where(eq(recipients.id, r.id));
 }
 
-/** Sends claim links to every contact that doesn't have one yet. Returns how many were sent / failed. */
+/** Sends claim links to every contact who hasn't received one. Returns how many were sent / failed. */
 export async function sendMissingClaimInvites(owner: User): Promise<{ sent: number; failed: number }> {
   const missing = await db
     .select()
     .from(recipients)
-    .where(and(eq(recipients.userId, owner.id), isNull(recipients.claimTokenHash)));
+    .where(and(eq(recipients.userId, owner.id), isNull(recipients.claimLinkSentAt)));
   let sent = 0;
   let failed = 0;
   for (const r of missing) {
@@ -210,7 +222,6 @@ export async function sendMissingClaimInvites(owner: User): Promise<{ sent: numb
       sent++;
     } catch (err) {
       console.error(`claim invite to recipient ${r.id} failed`, err);
-      await db.update(recipients).set({ claimTokenHash: null }).where(eq(recipients.id, r.id));
       failed++;
     }
   }
@@ -222,10 +233,16 @@ export async function revokeClaimLinks(ownerId: string): Promise<void> {
   await db.update(recipients).set({ claimTokenHash: null, claimLinkSentAt: null }).where(eq(recipients.userId, ownerId));
 }
 
+/** One contact's link stops working (e.g. their email address changed). */
+export async function revokeClaimLink(recipientId: string): Promise<void> {
+  await db.update(recipients).set({ claimTokenHash: null, claimLinkSentAt: null }).where(eq(recipients.id, recipientId));
+}
+
 export type ClaimView =
   | { state: "invalid" }
   | { state: "inactive"; ownerName: string }
   | { state: "released"; ownerName: string }
+  | { state: "limited"; ownerName: string }
   | { state: "pending"; ownerName: string; byYou: boolean; releaseDate: Date }
   | { state: "open"; ownerName: string; recipientName: string; waitDays: number };
 
@@ -250,31 +267,53 @@ export async function getClaimView(token: string): Promise<ClaimView> {
 
 /** A trusted contact requests access. Starts the owner's waiting period and notifies them. */
 export async function startClaim(token: string): Promise<ClaimView> {
-  const found = await findClaimant(token);
-  if (!found) return { state: "invalid" };
-  const now = new Date();
+  const view = await getClaimView(token);
+  if (view.state !== "open") return view;
+  const found = (await findClaimant(token))!;
+  // A contact can't flood the owner with claims (each one emails the owner).
+  if (!(await allow(`claim:${found.r.id}`, LIMITS.claimsPerContactPerDay.limit, LIMITS.claimsPerContactPerDay.window))) {
+    return { state: "limited", ownerName: view.ownerName };
+  }
   // Atomic: only one claim can be pending, and only while claim mode is on.
   const [updated] = await db
     .update(users)
-    .set({ switchStatus: "warning", warningStartedAt: now, lastReminderAt: now, claimRecipientId: found.r.id })
+    .set({ switchStatus: "warning", warningStartedAt: new Date(), lastReminderAt: null, claimRecipientId: found.r.id })
     .where(and(eq(users.id, found.owner.id), eq(users.switchStatus, "active"), eq(users.switchMode, "claim"), eq(users.switchEnabled, true)))
     .returning();
-  if (updated) {
-    await sendReminder(updated).catch((e) => console.error("claim notice to owner failed", e));
-  }
+  // If this first notice fails, the daily job keeps retrying, and nothing is released until one arrives.
+  if (updated) await deliverReminder(updated);
   return getClaimView(token);
 }
 
+// ---------- the daily job ----------
+
+/**
+ * Sends release emails. Only contacts that existed when the vault was released get one (people added
+ * afterwards were never told anything would be shared). Each contact is "claimed" before sending, so two
+ * overlapping runs can never both email the same person (which would also kill the first link).
+ */
 async function releaseToRecipients(u: User): Promise<{ sent: number; failed: number }> {
+  if (!u.triggeredAt) return { sent: 0, failed: 0 };
   const pending = await db
     .select()
     .from(recipients)
-    .where(and(eq(recipients.userId, u.id), isNull(recipients.releasedAt)));
+    .where(and(eq(recipients.userId, u.id), isNull(recipients.releasedAt), lte(recipients.createdAt, u.triggeredAt)));
   let sent = 0;
   let failed = 0;
   for (const r of pending) {
     const { token, hash } = newToken();
-    await db.update(recipients).set({ accessTokenHash: hash }).where(eq(recipients.id, r.id));
+    const [claimed] = await db
+      .update(recipients)
+      .set({ accessTokenHash: hash, releaseAttemptAt: new Date() })
+      .where(
+        and(
+          eq(recipients.id, r.id),
+          isNull(recipients.releasedAt),
+          or(isNull(recipients.releaseAttemptAt), lt(recipients.releaseAttemptAt, new Date(Date.now() - 15 * 60_000))),
+        ),
+      )
+      .returning({ id: recipients.id });
+    if (!claimed) continue; // another run is sending this one
     try {
       await sendEmail(
         releaseEmail({
@@ -283,70 +322,144 @@ async function releaseToRecipients(u: User): Promise<{ sent: number; failed: num
           ownerName: u.name || u.email,
           ownerEmail: u.email,
           link: `${appUrl()}/access/${token}`,
+          mode: u.switchMode,
         }),
       );
       await db.update(recipients).set({ releasedAt: new Date() }).where(eq(recipients.id, r.id));
       sent++;
     } catch (err) {
       console.error(`release email to recipient ${r.id} failed`, err);
-      failed++; // retried on the next cron run with a fresh token
+      failed++; // retried on a later run with a fresh token
     }
   }
   return { sent, failed };
 }
 
-export async function processUser(u: User, now = new Date()): Promise<SwitchAction> {
+/** Carries out one user's next step. Works on a fresh read, and every state change is compare-and-set. */
+export async function processUser(snapshot: Pick<User, "id">, now = new Date()): Promise<SwitchAction> {
+  const u = await db.query.users.findFirst({ where: eq(users.id, snapshot.id) });
+  if (!u) return "none";
   const action = evaluateSwitch(u, now);
   switch (action) {
     case "start_warning": {
-      const [updated] = await db
+      const dueBy = new Date(now.getTime() + SLACK_MS);
+      const [started] = await db
         .update(users)
-        .set({ switchStatus: "warning", warningStartedAt: now, lastReminderAt: now })
-        .where(eq(users.id, u.id))
+        .set({ switchStatus: "warning", warningStartedAt: now, lastReminderAt: null, checkInToken: null })
+        .where(
+          and(
+            eq(users.id, u.id),
+            eq(users.switchStatus, "active"),
+            eq(users.switchMode, "checkin"),
+            eq(users.switchEnabled, true),
+            sql`${users.lastCheckInAt} + ${users.checkInIntervalDays} * interval '1 day' <= ${dueBy.toISOString()}::timestamptz`,
+          ),
+        )
         .returning();
-      await sendReminder(updated);
-      break;
+      if (!started) return "none"; // checked in meanwhile
+      if (!(await deliverReminder(started))) throw new Error("reminder could not be delivered (will retry)");
+      return action;
     }
-    case "remind": {
-      const [updated] = await db.update(users).set({ lastReminderAt: now }).where(eq(users.id, u.id)).returning();
-      await sendReminder(updated);
-      break;
-    }
+    case "remind":
+      if (!(await deliverReminder(u))) throw new Error("reminder could not be delivered (will retry)");
+      return action;
     case "trigger": {
-      const [updated] = await db
+      const [released] = await db
         .update(users)
         .set({ switchStatus: "triggered", triggeredAt: now, checkInToken: null, claimRecipientId: null })
-        .where(eq(users.id, u.id))
+        .where(sameWarning(u))
         .returning();
-      const { sent } = await releaseToRecipients(updated);
-      await sendEmail(releasedNoticeEmail({ to: u.email, count: sent })).catch((e) => console.error(e));
-      break;
+      if (!released) return "none"; // the owner responded meanwhile
+      const { sent } = await releaseToRecipients(released);
+      await sendEmail(releasedNoticeEmail({ to: u.email, count: sent, mode: u.switchMode })).catch((e) => console.error(e));
+      return action;
     }
     case "release_pending":
       await releaseToRecipients(u);
-      break;
+      return action;
+    default:
+      return action;
   }
-  return action;
 }
 
-/** Called daily by Vercel Cron. */
+/** Takes a short lease so overlapping runs (Vercel can deliver a cron twice) don't both work. */
+async function acquireLease(name: string, seconds: number): Promise<boolean> {
+  const until = new Date(Date.now() + seconds * 1000);
+  const rows = await db
+    .insert(jobLeases)
+    .values({ name, lockedUntil: until })
+    .onConflictDoUpdate({ target: jobLeases.name, set: { lockedUntil: until }, setWhere: lt(jobLeases.lockedUntil, new Date()) })
+    .returning({ name: jobLeases.name });
+  return rows.length > 0;
+}
+
+async function releaseLease(name: string) {
+  await db.update(jobLeases).set({ lockedUntil: new Date(0) }).where(eq(jobLeases.name, name));
+}
+
+/** Deletes data that has served its purpose. */
+async function housekeeping() {
+  await db.delete(loginTokens).where(lt(loginTokens.createdAt, new Date(Date.now() - DAY)));
+  await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
+  await db.delete(rateLimits).where(lt(rateLimits.windowStart, new Date(Date.now() - 2 * DAY)));
+}
+
+const TIME_BUDGET_MS = 45_000;
+
+/** Called daily by Vercel Cron. Loads only users with something due, oldest first, within a time budget. */
 export async function runSwitchCheck(now = new Date()) {
-  const candidates = await db.select().from(users).where(eq(users.switchEnabled, true));
-  const summary: Record<SwitchAction | "error", number> = {
-    none: 0,
-    start_warning: 0,
-    remind: 0,
-    trigger: 0,
-    release_pending: 0,
-    error: 0,
-  };
-  for (const u of candidates) {
-    try {
-      summary[await processUser(u, now)]++;
-    } catch (err) {
-      console.error(`switch check failed for user ${u.id}`, err);
-      summary.error++;
+  if (!(await acquireLease("switch-check", 10 * 60))) return { skipped: "another run is in progress" };
+  try {
+    const startedAt = Date.now();
+    const dueBy = new Date(now.getTime() + SLACK_MS);
+    const unreleased = db
+      .select({ x: sql`1` })
+      .from(recipients)
+      .where(and(eq(recipients.userId, users.id), isNull(recipients.releasedAt), lte(recipients.createdAt, users.triggeredAt)));
+    const candidates = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.switchEnabled, true),
+          or(
+            eq(users.switchStatus, "warning"),
+            and(eq(users.switchStatus, "triggered"), exists(unreleased)),
+            and(
+              eq(users.switchStatus, "active"),
+              eq(users.switchMode, "checkin"),
+              sql`${users.lastCheckInAt} + ${users.checkInIntervalDays} * interval '1 day' <= ${dueBy.toISOString()}::timestamptz`,
+            ),
+          ),
+        ),
+      )
+      .orderBy(asc(users.lastCheckInAt));
+
+    const summary: Record<SwitchAction | "error" | "deferred", number> = {
+      none: 0,
+      start_warning: 0,
+      remind: 0,
+      trigger: 0,
+      release_pending: 0,
+      error: 0,
+      deferred: 0,
+    };
+    for (const [i, c] of candidates.entries()) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) {
+        summary.deferred = candidates.length - i; // picked up by the next run
+        console.error(`switch check: time budget used, ${summary.deferred} users deferred`);
+        break;
+      }
+      try {
+        summary[await processUser(c, now)]++;
+      } catch (err) {
+        console.error(`switch check failed for user ${c.id}`, err);
+        summary.error++;
+      }
     }
+    await housekeeping().catch((e) => console.error("housekeeping failed", e));
+    return { checked: candidates.length, ...summary };
+  } finally {
+    await releaseLease("switch-check");
   }
-  return { checked: candidates.length, ...summary };
 }

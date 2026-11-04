@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import { db, schema } from "@/db";
 import { endSession, requireUser } from "@/lib/auth";
 import {
@@ -17,13 +16,15 @@ import {
 } from "@/lib/switch";
 import { GRACE_OPTIONS, INTERVAL_OPTIONS } from "@/lib/config";
 import type { FormState } from "./vault";
+import { assertUserEmailAllowed, RateLimited } from "@/lib/rate-limit";
+import { oneLineName } from "@/lib/validation";
 
 const { users, recipients } = schema;
 
 
 export async function saveNameAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await requireUser();
-  const name = z.string().trim().min(1).max(120).safeParse(formData.get("name"));
+  const name = oneLineName().safeParse(formData.get("name") ?? "");
   if (!name.success) return { fieldErrors: { name: ["Please enter your name."] } };
   await db.update(users).set({ name: name.data }).where(eq(users.id, user.id));
   revalidatePath("/settings");
@@ -71,8 +72,10 @@ export async function saveSwitchAction(_prev: SwitchFormState, formData: FormDat
 export async function sendTestReminderAction(): Promise<SwitchFormState> {
   const user = await requireUser();
   try {
+    await assertUserEmailAllowed(user.id);
     await sendReminder(user, { test: true });
   } catch (err) {
+    if (err instanceof RateLimited) return { error: err.message };
     console.error(err);
     return { error: "Sending failed. Check your email provider settings." };
   }
@@ -97,6 +100,7 @@ export async function deleteAccountAction(_prev: FormState, formData: FormData):
   const user = await requireUser();
   if (String(formData.get("confirm") ?? "").trim() !== "DELETE") return { error: 'Type DELETE to confirm.' };
   await db.delete(users).where(eq(users.id, user.id));
+  await db.delete(schema.loginTokens).where(eq(schema.loginTokens.email, user.email));
   await endSession();
   redirect("/?deleted=1");
 }

@@ -3,10 +3,12 @@
 import { useActionState } from "react";
 import { requestLoginAction, type LoginState } from "@/app/actions/auth";
 import { SubmitButton } from "@/components/submit-button";
+import { useSubmitWithoutReset } from "@/components/use-submit";
 import { Alert, Field, Input } from "@/components/ui";
 
 export function LoginForm({ attribution = {} }: { attribution?: Record<string, string> }) {
-  const [state, action] = useActionState<LoginState, FormData>(requestLoginAction, {});
+  const [state, action, pending] = useActionState<LoginState, FormData>(requestLoginAction, {});
+  const onSubmit = useSubmitWithoutReset(action);
 
   if (state.sentTo) {
     return (
@@ -22,7 +24,7 @@ export function LoginForm({ attribution = {} }: { attribution?: Record<string, s
   }
 
   return (
-    <form action={action} className="space-y-5">
+    <form onSubmit={onSubmit} className="space-y-5">
       {Object.entries(attribution).map(([k, v]) => (
         <input key={k} type="hidden" name={k} value={v} />
       ))}
@@ -34,7 +36,7 @@ export function LoginForm({ attribution = {} }: { attribution?: Record<string, s
       <Field label="Email address" htmlFor="email">
         <Input id="email" name="email" type="email" autoComplete="email" required autoFocus placeholder="you@example.com" />
       </Field>
-      <SubmitButton className="w-full" pendingText="Sending…">Email me a sign-in link</SubmitButton>
+      <SubmitButton className="w-full" pendingText="Sending…" pending={pending}>Email me a sign-in link</SubmitButton>
     </form>
   );
 }

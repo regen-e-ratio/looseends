@@ -4,6 +4,13 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 
+// Preview deployments share production's environment variables (and so its database). Only the
+// production build may change the schema; otherwise every pushed branch would migrate production.
+if (process.env.VERCEL && process.env.VERCEL_ENV !== "production") {
+  console.log(`⏭ Skipping migrations on a ${process.env.VERCEL_ENV} deployment`);
+  process.exit(0);
+}
+
 const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 if (!url) {
   if (process.env.VERCEL) {

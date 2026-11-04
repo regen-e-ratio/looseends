@@ -9,6 +9,12 @@ import { ITEM_KINDS, KIND_ORDER, findField, isKind, kindWarning, type ItemKind }
 import type { VaultItem } from "@/lib/vault";
 
 type Contact = { id: string; name: string };
+/** What someone typed but hasn't saved yet, per selection (kept while they move around the vault). */
+type Draft = { title: string; reference: string; notes: string; share: "all" | "selected"; recipientIds: string[] };
+
+function selectionKey(sel: Selection): string {
+  return sel ? (sel.type === "item" ? `item:${sel.id}` : `new:${sel.kind}`) : "none";
+}
 type Selection = { type: "item"; id: string } | { type: "new"; kind: ItemKind } | null;
 
 function readSelection(params: URLSearchParams): Selection {
@@ -27,38 +33,47 @@ function urlFor(sel: Selection): string {
 /**
  * The whole vault on one page: everything on the left, the selected item (or a new one) on the right.
  * The selection lives in the URL, so switching is instant (no page load) and back/forward work.
- * The editor is keyed by the selection, so it starts fresh every time you switch.
+ * The editor is keyed by the selection, so it re-renders for every switch. Unsaved edits are kept as a
+ * draft per selection, so switching away (or pressing Back) never loses them; they're marked "Unsaved".
  */
 export function VaultEditor({ items, contacts }: { items: VaultItem[]; contacts: Contact[] }) {
   const params = useSearchParams();
   const selection = readSelection(new URLSearchParams(params.toString()));
-  const [dirty, setDirty] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  // Bumped by "Discard" to remount the editor from the saved values.
+  const [discards, setDiscards] = useState(0);
   // The item that was just created: its (remounted) editor starts out showing "✓ Saved".
   const [justCreated, setJustCreated] = useState<string | null>(null);
 
   const select = (next: Selection, { replace = false } = {}) => {
-    if (dirty && !window.confirm("You have unsaved changes. Leave them?")) return;
-    setDirty(false);
     setJustCreated(null);
     window.history[replace ? "replaceState" : "pushState"](null, "", urlFor(next));
     if (window.matchMedia("(max-width: 1023px)").matches) window.scrollTo({ top: 0 });
   };
+  const setDraft = (key: string, draft: Draft | null) =>
+    setDrafts((all) => {
+      const next = { ...all };
+      if (draft) next[key] = draft;
+      else delete next[key];
+      return next;
+    });
 
-  // Warn before closing the tab with unsaved changes.
+  // Warn before closing the tab while anything is unsaved.
+  const unsaved = Object.keys(drafts).length > 0;
   useEffect(() => {
-    if (!dirty) return;
+    if (!unsaved) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+  }, [unsaved]);
 
   const current = selection?.type === "item" ? items.find((i) => i.id === selection.id) : undefined;
-  const key = selection ? (selection.type === "item" ? `item:${selection.id}` : `new:${selection.kind}`) : "none";
+  const key = selectionKey(selection);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
       <aside className={cx("lg:sticky lg:top-6", selection && "max-lg:hidden")} aria-label="Everything in your vault">
-        <ItemList items={items} selection={selection} onSelect={select} />
+        <ItemList items={items} selection={selection} onSelect={select} unsaved={drafts} />
       </aside>
 
       <section className={cx(!selection && "max-lg:hidden")} aria-label="Editor">
@@ -75,20 +90,25 @@ export function VaultEditor({ items, contacts }: { items: VaultItem[]; contacts:
           </Card>
         ) : (
           <ItemEditor
-            key={key}
+            key={`${key}:${discards}`}
             kind={current?.kind ?? (selection as { kind: ItemKind }).kind}
             item={current}
             contacts={contacts}
             justCreated={!!current && current.id === justCreated}
-            onDirty={setDirty}
+            draft={drafts[key]}
+            onDraft={(d) => setDraft(key, d)}
+            onDiscard={() => {
+              setDraft(key, null);
+              setDiscards((n) => n + 1);
+            }}
             onKindChange={(kind) => select({ type: "new", kind }, { replace: true })}
             onCreated={(id) => {
-              setDirty(false);
+              setDraft(key, null);
               setJustCreated(id);
               window.history.replaceState(null, "", urlFor({ type: "item", id }));
             }}
             onDeleted={() => {
-              setDirty(false);
+              setDraft(key, null);
               window.history.replaceState(null, "", urlFor(null));
             }}
           />
@@ -100,7 +120,17 @@ export function VaultEditor({ items, contacts }: { items: VaultItem[]; contacts:
 
 // ---------- left: everything in the vault ----------
 
-function ItemList({ items, selection, onSelect }: { items: VaultItem[]; selection: Selection; onSelect: (s: Selection) => void }) {
+function ItemList({
+  items,
+  selection,
+  onSelect,
+  unsaved,
+}: {
+  items: VaultItem[];
+  selection: Selection;
+  onSelect: (s: Selection) => void;
+  unsaved: Record<string, Draft>;
+}) {
   const groups = KIND_ORDER.map((k) => ({ kind: k, items: items.filter((i) => i.kind === k) })).filter((g) => g.items.length);
   return (
     <div className="rounded-xl border border-stone-200 bg-white shadow-sm">
@@ -133,7 +163,12 @@ function ItemList({ items, selection, onSelect }: { items: VaultItem[]; selectio
                           active ? "border-teal-700 bg-teal-50 text-teal-900" : "border-transparent hover:bg-stone-50",
                         )}
                       >
-                        <span className="block truncate text-sm font-medium">{item.title}</span>
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium">{unsaved[`item:${item.id}`]?.title || item.title}</span>
+                          {unsaved[`item:${item.id}`] && (
+                            <span className="shrink-0 rounded-full bg-amber-100 px-1.5 text-[10px] font-medium text-amber-800">Unsaved</span>
+                          )}
+                        </span>
                         {item.reference && <span className="block truncate text-xs text-stone-500">{item.reference}</span>}
                       </button>
                     </li>
@@ -227,7 +262,9 @@ function ItemEditor({
   item,
   contacts,
   justCreated = false,
-  onDirty,
+  draft,
+  onDraft,
+  onDiscard,
   onKindChange,
   onCreated,
   onDeleted,
@@ -236,7 +273,9 @@ function ItemEditor({
   item?: VaultItem;
   contacts: Contact[];
   justCreated?: boolean;
-  onDirty: (dirty: boolean) => void;
+  draft?: Draft;
+  onDraft: (draft: Draft | null) => void;
+  onDiscard: () => void;
   onKindChange: (kind: ItemKind) => void;
   onCreated: (id: string) => void;
   onDeleted: () => void;
@@ -246,20 +285,33 @@ function ItemEditor({
   const warning = kindWarning(kind);
   const [result, setResult] = useState<SaveItemResult>({});
   const [saved, setSaved] = useState(justCreated);
-  const [share, setShare] = useState<"all" | "selected">(item && !item.shareWithAll ? "selected" : "all");
+  const [share, setShare] = useState<"all" | "selected">(draft?.share ?? (item && !item.shareWithAll ? "selected" : "all"));
+  const initial = {
+    title: draft?.title ?? item?.title ?? "",
+    reference: draft?.reference ?? item?.reference ?? "",
+    notes: draft?.notes ?? item?.notes ?? "",
+    recipientIds: draft?.recipientIds ?? item?.recipientIds ?? [],
+  };
   const [pending, start] = useTransition();
   const [deleting, startDelete] = useTransition();
   const err = (f: string) => result.fieldErrors?.[f]?.[0];
 
-  const changed = () => {
+  const changed = (form: HTMLFormElement) => {
     setSaved(false);
-    onDirty(true);
+    const data = new FormData(form);
+    onDraft({
+      title: String(data.get("title") ?? ""),
+      reference: String(data.get("reference") ?? ""),
+      notes: String(data.get("notes") ?? ""),
+      share: data.get("share") === "selected" ? "selected" : "all",
+      recipientIds: data.getAll("recipientIds").map(String),
+    });
   };
 
   return (
     <form
       noValidate
-      onChange={changed}
+      onChange={(e) => changed(e.currentTarget)}
       onSubmit={(e) => {
         e.preventDefault();
         const data = new FormData(e.currentTarget);
@@ -267,7 +319,7 @@ function ItemEditor({
           const r = await saveItemAction(data);
           setResult(r);
           if (!r.ok) return;
-          onDirty(false);
+          onDraft(null);
           setSaved(true);
           if (!item && r.id) onCreated(r.id);
         });
@@ -308,13 +360,13 @@ function ItemEditor({
         <div className={cx("grid gap-4", find && "sm:grid-cols-2")}>
           <label className="block space-y-1.5">
             <span className="block text-sm font-medium text-stone-700">{def.title.label}</span>
-            <Input name="title" defaultValue={item?.title} placeholder={def.title.placeholder} maxLength={200} aria-invalid={!!err("title")} autoFocus={!item} />
+            <Input name="title" defaultValue={initial.title} placeholder={def.title.placeholder} maxLength={200} aria-invalid={!!err("title")} autoFocus={!item} />
             {err("title") && <span className="block text-xs text-red-700">{err("title")}</span>}
           </label>
           {find && (
             <label className="block space-y-1.5">
               <span className="block text-sm font-medium text-stone-700">{find.label}</span>
-              <Input name="reference" defaultValue={item?.reference} placeholder={find.placeholder} maxLength={200} />
+              <Input name="reference" defaultValue={initial.reference} placeholder={find.placeholder} maxLength={200} />
             </label>
           )}
         </div>
@@ -339,7 +391,7 @@ function ItemEditor({
           <Textarea
             id="notes"
             name="notes"
-            defaultValue={item?.notes}
+            defaultValue={initial.notes}
             placeholder={def.notes.placeholder}
             rows={kind === "message" ? 12 : 6}
             maxLength={20000}
@@ -378,7 +430,7 @@ function ItemEditor({
             <div className="flex flex-wrap gap-2 pt-1">
               {contacts.map((c) => (
                 <label key={c.id} className="flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-1.5 text-sm">
-                  <input type="checkbox" name="recipientIds" value={c.id} defaultChecked={item?.recipientIds.includes(c.id)} className="accent-teal-700" />
+                  <input type="checkbox" name="recipientIds" value={c.id} defaultChecked={initial.recipientIds.includes(c.id)} className="accent-teal-700" />
                   {c.name}
                 </label>
               ))}
@@ -392,6 +444,16 @@ function ItemEditor({
           {pending ? "Saving…" : item ? "Save changes" : "Add to vault"}
         </Button>
         {saved && !pending && <span className="text-sm text-emerald-700">✓ Saved</span>}
+        {draft && !pending && (
+          <span className="flex items-center gap-2 text-sm text-amber-700">
+            Unsaved changes
+            {item && (
+              <button type="button" className="text-stone-500 underline-offset-2 hover:underline" onClick={onDiscard}>
+                Discard
+              </button>
+            )}
+          </span>
+        )}
         {item && (
           <Button
             type="button"

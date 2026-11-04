@@ -127,7 +127,8 @@ export type ItemKind = keyof typeof ITEM_KINDS;
 export const KIND_ORDER = Object.keys(ITEM_KINDS) as ItemKind[];
 
 export function isKind(k: unknown): k is ItemKind {
-  return typeof k === "string" && k in ITEM_KINDS;
+  // Own keys only: `"toString" in ITEM_KINDS` is true too.
+  return typeof k === "string" && Object.hasOwn(ITEM_KINDS, k);
 }
 
 /** The "how to find it" field of a kind, if it has one. */

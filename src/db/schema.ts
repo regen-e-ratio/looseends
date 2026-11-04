@@ -87,6 +87,8 @@ export const recipients = pgTable(
     accessTokenHash: text("access_token_hash").unique(),
     /** sha256 of this contact's personal "request access" link (claim mode only). */
     claimTokenHash: text("claim_token_hash").unique(),
+    /** Set by whichever cron run is sending this contact's release email, so two runs never both send. */
+    releaseAttemptAt: tz("release_attempt_at"),
     claimLinkSentAt: tz("claim_link_sent_at"),
     releasedAt: tz("released_at"),
   },
@@ -120,3 +122,20 @@ export const itemRecipients = pgTable(
 export type User = typeof users.$inferSelect;
 export type Recipient = typeof recipients.$inferSelect;
 export type ItemRow = typeof items.$inferSelect;
+
+/** Fixed-window counters for rate limiting (sign-in emails, user-triggered emails, claims). */
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    key: text("key").notNull(),
+    windowStart: tz("window_start").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.key, t.windowStart] })],
+);
+
+/** Short leases so a scheduled job never runs twice at the same time (Vercel may deliver a cron twice). */
+export const jobLeases = pgTable("job_leases", {
+  name: text("name").primaryKey(),
+  lockedUntil: tz("locked_until").notNull(),
+});

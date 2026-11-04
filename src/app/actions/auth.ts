@@ -9,6 +9,7 @@ import { appUrl } from "@/lib/config";
 import { loginEmail, sendEmail } from "@/lib/email";
 import { recordActivity } from "@/lib/switch";
 import { isLandingSlug } from "@/marketing";
+import { LIMITS, allow, clientKey } from "@/lib/rate-limit";
 
 export type LoginState = { error?: string; sentTo?: string };
 
@@ -16,6 +17,13 @@ export async function requestLoginAction(_prev: LoginState, formData: FormData):
   const parsed = z.email().safeParse(normalizeEmail(String(formData.get("email") ?? "")));
   if (!parsed.success) return { error: "Please enter a valid email address." };
   const email = parsed.data;
+
+  // Every request sends a real email: limit per client and site-wide, not only per address
+  // (otherwise anyone could script sign-ups to many addresses and exhaust our sending quota).
+  const ip = await clientKey();
+  const busy = "Too many sign-in requests right now. Please wait a little and try again.";
+  if (ip && !(await allow(`login:ip:${ip}`, LIMITS.loginPerIp.limit, LIMITS.loginPerIp.window))) return { error: busy };
+  if (!(await allow("login:global", LIMITS.loginGlobal.limit, LIMITS.loginGlobal.window))) return { error: busy };
 
   const token = await createLoginToken(email, attributionFrom(formData));
   if (!token) return { error: "Too many sign-in emails were requested. Please wait 15 minutes and try again." };

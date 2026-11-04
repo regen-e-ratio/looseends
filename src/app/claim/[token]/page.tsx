@@ -37,6 +37,14 @@ export default async function ClaimPage({ params }: PageProps<"/claim/[token]">)
       </AuthShell>
     );
   }
+  if (view.state === "limited") {
+    return (
+      <AuthShell>
+        <h1 className="text-xl font-semibold">Too many requests today</h1>
+        <p className="mt-2 text-stone-600">Access to {view.ownerName}&apos;s information was requested several times today. Please try again tomorrow.</p>
+      </AuthShell>
+    );
+  }
   if (view.state === "released") {
     return (
       <AuthShell>

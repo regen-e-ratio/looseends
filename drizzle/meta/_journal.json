@@ -36,6 +36,13 @@
       "when": 1793824060325,
       "tag": "0004_drop_relationship",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793827348609,
+      "tag": "0005_security_hardening",
+      "breakpoints": true
     }
   ]
 }

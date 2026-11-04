@@ -8,13 +8,17 @@ export function SubmitButton({
   children,
   pendingText,
   confirm,
+  pending: pendingOverride,
+  disabled,
   ...props
-}: ComponentProps<typeof Button> & { pendingText?: string; confirm?: string }) {
-  const { pending } = useFormStatus();
+}: ComponentProps<typeof Button> & { pendingText?: string; confirm?: string; pending?: boolean }) {
+  const status = useFormStatus();
+  // Forms submitted via useSubmitWithoutReset aren't tracked by useFormStatus, so they pass `pending`.
+  const pending = pendingOverride ?? status.pending;
   return (
     <Button
       type="submit"
-      disabled={pending || props.disabled}
+      disabled={pending || disabled}
       onClick={(e) => {
         if (confirm && !window.confirm(confirm)) e.preventDefault();
       }}

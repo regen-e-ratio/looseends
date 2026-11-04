@@ -11,13 +11,15 @@ import { contactAddedEmail, sendEmail } from "@/lib/email";
 import { ONBOARDING_KINDS } from "@/lib/onboarding";
 import { restartSchedule, sendMissingClaimInvites } from "@/lib/switch";
 import { encodePayload } from "@/lib/vault";
+import { assertUserEmailAllowed } from "@/lib/rate-limit";
+import { oneLineName } from "@/lib/validation";
 
 const { users, items, recipients } = schema;
 
 export type StepState = { ok?: boolean; error?: string; saved?: number };
 
 const stepOneSchema = z.object({
-  name: z.string().trim().min(1, "Please tell us your name.").max(120),
+  name: oneLineName("Please tell us your name."),
   messageTitle: z.string().trim().max(200).default(""),
   messageBody: z.string().trim().max(20_000).default(""),
   things: z
@@ -70,7 +72,7 @@ export async function saveStepOneAction(_prev: StepState, formData: FormData): P
 const contactsSchema = z
   .array(
     z.object({
-      name: z.string().trim().min(1, "Every person needs a name.").max(120),
+      name: oneLineName("Every person needs a name."),
       email: z.preprocess((v) => normalizeEmail(String(v ?? "")), z.email("Please check the email addresses.")),
     }),
   )
@@ -138,6 +140,7 @@ export async function finishOnboardingAction(_prev: StepState, formData: FormDat
       .where(and(eq(recipients.userId, user.id), isNull(recipients.notifiedAt)));
     for (const r of pending) {
       try {
+        await assertUserEmailAllowed(user.id);
         await sendEmail(contactAddedEmail({ to: r.email, recipientName: r.name, ownerName: saved.name || saved.email, ownerEmail: saved.email }));
         await db.update(recipients).set({ notifiedAt: new Date() }).where(eq(recipients.id, r.id));
       } catch (err) {

@@ -7,14 +7,16 @@ import { db, schema } from "@/db";
 import { normalizeEmail, requireUser } from "@/lib/auth";
 import { encryptNullable } from "@/lib/crypto";
 import { contactAddedEmail, sendEmail } from "@/lib/email";
-import { dropClaim, sendClaimInvite } from "@/lib/switch";
+import { dropClaim, revokeClaimLink, sendClaimInvite } from "@/lib/switch";
+import { assertUserEmailAllowed, RateLimited } from "@/lib/rate-limit";
+import { oneLineName } from "@/lib/validation";
 import type { FormState } from "./vault";
 
 const { recipients } = schema;
 const MAX_CONTACTS = 25;
 
 const contactSchema = z.object({
-  name: z.string().trim().min(1, "Please enter a name").max(120),
+  name: oneLineName("Please enter a name"),
   email: z.preprocess((v) => normalizeEmail(String(v ?? "")), z.email("Please enter a valid email")),
   personalMessage: z.string().trim().max(20_000).optional().default(""),
 });
@@ -38,14 +40,22 @@ export async function saveContactAction(_prev: FormState, formData: FormData): P
   if (id) {
     const before = await db.query.recipients.findFirst({ where: and(eq(recipients.id, id), eq(recipients.userId, user.id)) });
     if (!before) return { error: "Contact not found." };
+    const emailChanged = before.email !== email;
+    if (emailChanged) {
+      const taken = await db.query.recipients.findFirst({ where: and(eq(recipients.userId, user.id), eq(recipients.email, email)) });
+      if (taken) return { fieldErrors: { email: ["You already added this person."] } };
+    }
     const [updated] = await db.update(recipients).set(values).where(eq(recipients.id, id)).returning();
-    // New address in claim mode: the old personal link goes to the wrong person, so issue a new one.
     let failed = false;
-    if (claimMode && before.email !== email) {
-      await sendClaimInvite(user, updated).catch((e) => {
-        console.error("claim invite failed", e);
-        failed = true;
-      });
+    if (emailChanged) {
+      // The old personal link belongs to the old address: it must stop working whatever the mode.
+      await revokeClaimLink(id);
+      if (claimMode) {
+        await sendClaimInvite(user, updated).catch((e) => {
+          console.error("claim invite failed", e);
+          failed = true;
+        });
+      }
     }
     redirect(`/contacts?saved=1${failed ? "&notifyFailed=1" : ""}`);
   }
@@ -67,6 +77,7 @@ export async function saveContactAction(_prev: FormState, formData: FormData): P
     }
   } else if (formData.get("notify") === "on") {
     try {
+      await assertUserEmailAllowed(user.id);
       await sendEmail(contactAddedEmail({ to: email, recipientName: name, ownerName: user.name || user.email, ownerEmail: user.email }));
       await db.update(recipients).set({ notifiedAt: new Date() }).where(eq(recipients.id, row.id));
     } catch (err) {
@@ -95,6 +106,7 @@ export async function resendClaimLinkAction(formData: FormData) {
   try {
     await sendClaimInvite(user, r);
   } catch (err) {
+    if (err instanceof RateLimited) redirect("/contacts?limited=1");
     console.error("claim invite failed", err);
     redirect("/contacts?notifyFailed=1");
   }

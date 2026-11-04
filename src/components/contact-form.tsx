@@ -5,15 +5,17 @@ import Link from "next/link";
 import { saveContactAction } from "@/app/actions/contacts";
 import type { FormState } from "@/app/actions/vault";
 import { SubmitButton } from "./submit-button";
+import { useSubmitWithoutReset } from "./use-submit";
 import { Alert, Card, Field, Input, Textarea } from "./ui";
 
 type Initial = { id: string; name: string; email: string; personalMessage: string | null };
 
 export function ContactForm({ initial, claimMode = false }: { initial?: Initial; claimMode?: boolean }) {
-  const [state, action] = useActionState<FormState, FormData>(saveContactAction, {});
+  const [state, action, pending] = useActionState<FormState, FormData>(saveContactAction, {});
+  const onSubmit = useSubmitWithoutReset(action);
   const err = (k: string) => state.fieldErrors?.[k]?.[0];
   return (
-    <form action={action} className="space-y-6">
+    <form onSubmit={onSubmit} className="space-y-6">
       {initial && <input type="hidden" name="id" value={initial.id} />}
       {state.error && <Alert tone="danger">{state.error}</Alert>}
       <Card className="space-y-5">
@@ -53,7 +55,7 @@ export function ContactForm({ initial, claimMode = false }: { initial?: Initial;
         )}
       </Card>
       <div className="flex gap-3">
-        <SubmitButton>{initial ? "Save changes" : "Add contact"}</SubmitButton>
+        <SubmitButton pending={pending}>{initial ? "Save changes" : "Add contact"}</SubmitButton>
         <Link href="/contacts" className="px-4 py-2 text-sm font-medium text-stone-600 hover:text-stone-900">
           Cancel
         </Link>

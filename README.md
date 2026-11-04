@@ -87,10 +87,28 @@ BASE_URL=https://www.looseends.life node e2e/live-smoke.mjs   # add NODE_USE_ENV
 ```
 
 ## Security notes
-- Item contents and personal messages are encrypted at rest (AES-256-GCM, key derived from `ENCRYPTION_KEY`). Names and emails of contacts are not, because they're needed to send email.
-- Login, session, and access tokens are random 256-bit values. Only their SHA-256 hashes are stored.
-- Users are told not to store passwords, only *where* things are.
-- `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, and `noindex` on every page.
+- **Encryption at rest:** item contents and personal messages use AES-256-GCM, with the key derived from `ENCRYPTION_KEY`. Contacts' names and emails are not encrypted, because they're needed to send email.
+- **Tokens:** login, session, check-in, claim and access tokens are random 256-bit values. Only their SHA-256 hashes are stored; the check-in token is stored encrypted, so reminders can be re-sent.
+- **Authorization:** every server action checks the session, and every query is limited to the signed-in user's rows. Next.js checks the Origin header on server actions, which protects against CSRF.
+- **Rate limits** (`src/lib/rate-limit.ts`, a Postgres `rate_limits` table):
+  - Sign-in emails: per address, per client IP, and a site-wide limit.
+  - Emails a user can trigger (contact notifications, claim links, resends, test reminders): a daily cap.
+  - Claims: a limit per trusted contact.
+- **Headers:**
+  - `Content-Security-Policy`: same-origin only; `frame-ancestors 'none'`, except the ad pages, which the `/for` gallery frames.
+  - Also `X-Frame-Options`, `Referrer-Policy: no-referrer`, `nosniff`, and `noindex` on private pages.
+- **Analytics** only ever receive URLs with tokens and IDs removed (`src/components/analytics.tsx`).
+- **Release switch safety** (`src/lib/switch.ts`, rules in `switch-rules.ts`, unit-tested):
+  - Each user is re-read right before acting, and every state change is compare-and-set. A check-in that happens during the cron run can't be overridden by a release.
+  - Nothing is released until a reminder has actually been delivered. The first delivered reminder starts the grace period.
+  - A short lease prevents overlapping cron runs, and each contact is claimed before their release email, so nobody gets two emails.
+  - Contacts added after a release never receive access.
+- **Never stored:** passwords, PINs and seed phrases. Users are told to write down *where* things are.
+
+### Schema changes and deployments
+- Migrations run only for **production** builds (`scripts/migrate.mjs`). Preview deployments share production's environment variables, including its database, so they must never migrate it.
+  - Better still: enable *"Create a database branch for each preview"* in the Neon integration, so previews get their own copy.
+- The old deployment keeps serving until the new one is live, so schema changes must be **backward compatible**. Add columns or tables first; remove or rename them in a *later* deploy, once no running code uses them.
 
 ## Ideas for next iterations
 - Second factor for recipients (email code) before showing the vault

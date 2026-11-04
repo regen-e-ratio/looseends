@@ -10,7 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.mjs",
     "typecheck": "next typegen && tsc --noEmit",
-    "test:unit": "tsx src/components/analytics.test.ts"
+    "test:unit": "tsx src/components/analytics.test.ts && tsx src/lib/switch-rules.test.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

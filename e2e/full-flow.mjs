@@ -29,6 +29,8 @@ async function lastLink(to, pathPart) {
   }
   throw new Error(`no ${pathPart} email for ${to}`);
 }
+/** All dev emails to `to` (raw text blocks from the server log). */
+const mailsTo = (to) => readFileSync(LOG, "utf8").split("📧 [dev email]").filter((b) => b.includes(`to=${to} `));
 const emailsTo = (to) => readFileSync(LOG, "utf8").split("📧 [dev email]").filter((b) => b.includes(`to=${to} `)).length;
 async function cron() {
   const r = await fetch(`${BASE}/api/cron/check-switches`, { headers: { authorization: `Bearer ${CRON_SECRET}` } });
@@ -40,6 +42,11 @@ const step = (s) => console.log("•", s);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 page.on("pageerror", (e) => console.error("PAGE ERROR", e));
+// Any Content-Security-Policy violation means the policy blocks something the app needs.
+const cspViolations = [];
+page.on("console", (m) => {
+  if (/Content Security Policy/i.test(m.text())) cspViolations.push(m.text());
+});
 const shot = (n) => page.screenshot({ path: `${SHOTS}/${n}.png`, fullPage: true });
 
 try {
@@ -170,7 +177,7 @@ try {
   assert.ok(await sameDocument(), "adding an item doesn't reload the page");
   await shot("05-vault-bank");
 
-  step("vault page: validation, switching, unsaved-changes guard, back button");
+  step("vault page: validation, switching keeps drafts, back button, discard");
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByRole("menuitem", { name: /Investment/ }).click();
   await page.getByRole("button", { name: "Add to vault" }).click();
@@ -181,19 +188,31 @@ try {
   await page.getByRole("heading", { name: "Netflix" }).waitFor();
   assert.equal(await page.getByLabel("Account email").inputValue(), owner, "account email from onboarding");
   await page.getByLabel("Notes").fill("Cancel it please");
-  page.once("dialog", (d) => d.dismiss()); // unsaved change → stay
-  await page.getByRole("button", { name: /^ING/ }).click();
-  await page.getByRole("heading", { name: "Netflix" }).waitFor();
-  await page.getByRole("button", { name: "Save changes" }).click();
-  await page.getByText("✓ Saved").waitFor();
   const netflixUrl = page.url();
-  await page.getByRole("button", { name: /^ING/ }).click(); // saved → no prompt
+  // Switching away without saving keeps a draft (no prompt), marked in the list.
+  await page.getByRole("button", { name: /^ING/ }).click();
   await page.getByRole("heading", { name: "ING" }).waitFor();
+  await page.getByText("Unsaved", { exact: true }).waitFor();
+  // Browser Back returns to Netflix with the draft restored.
   await page.goBack();
   await page.getByRole("heading", { name: "Netflix" }).waitFor();
   assert.equal(page.url(), netflixUrl);
   assert.equal(await page.getByLabel("Notes").inputValue(), "Cancel it please");
+  await page.getByText("Unsaved changes").waitFor();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await page.getByText("✓ Saved").waitFor();
+  assert.equal(await page.getByText("Unsaved", { exact: true }).count(), 0, "saved → no longer marked unsaved");
+  // Discard throws a draft away and shows the saved values again.
+  await page.getByRole("button", { name: /^ING/ }).click();
+  await page.getByRole("heading", { name: "ING" }).waitFor();
+  await page.getByLabel("Notes").fill("typo typo");
+  await page.getByRole("button", { name: "Discard" }).click();
+  assert.equal(await page.getByLabel("Notes").inputValue(), "Bereavement team");
   assert.ok(await sameDocument(), "switching items doesn't reload the page");
+  // Unknown types in the URL (even inherited object keys) don't crash the page.
+  await page.goto(`${BASE}/vault?new=toString`);
+  await page.getByRole("heading", { name: "Add something to your vault" }).waitFor();
+  await page.evaluate(() => (window.__sameDocument = true));
 
   step("vault page: ideas tooltip");
   await page.getByRole("button", { name: /^ING/ }).click();
@@ -262,7 +281,9 @@ try {
 
   step("cron: nothing due yet");
   let res = await cron();
-  assert.ok(res.none >= 1 && res.trigger === 0, JSON.stringify(res));
+  assert.equal(res.error, 0, JSON.stringify(res));
+  let [u] = await sql`select switch_status, last_reminder_at from users where email=${owner}`;
+  assert.equal(u.switch_status, "active", "not due → nothing happens");
 
   step("8 days pass → reminder email");
   await sql`update users set last_check_in_at = now() - interval '8 days' where email=${owner}`;
@@ -276,7 +297,7 @@ try {
   await mail.getByRole("button", { name: "I'm OK" }).click();
   await mail.getByRole("heading", { name: /you're checked in/ }).waitFor();
   await mail.close();
-  let [u] = await sql`select switch_status from users where email=${owner}`;
+  [u] = await sql`select switch_status from users where email=${owner}`;
   assert.equal(u.switch_status, "active");
 
   step("opening the app checks in automatically (also during reminders)");
@@ -302,10 +323,31 @@ try {
   res = await cron();
   assert.ok(res.remind >= 1 && emailsTo(owner) === before + 1, "follow-up reminder after 1 day with a 3-day grace period");
   await sql`update users set warning_started_at = now() - interval '4 days', last_reminder_at = now() - interval '1 day' where email=${owner}`;
-  res = await cron();
-  assert.ok(res.trigger >= 1, JSON.stringify(res));
+  // Two runs at the same moment (Vercel can deliver a cron twice): exactly one release email per contact.
+  const results = await Promise.all([cron(), cron()]);
+  assert.ok(results.some((r) => r.trigger >= 1), JSON.stringify(results));
   [u] = await sql`select switch_status from users where email=${owner}`;
   assert.equal(u.switch_status, "triggered");
+  await cron(); // a later run doesn't send again either
+  for (const who of [anna, bob]) {
+    assert.equal(mailsTo(who).filter((m) => m.includes("/access/")).length, 1, `exactly one release email to ${who}`);
+  }
+  assert.ok(mailsTo(anna).at(-1).includes("not responded to repeated check-in reminders"), "check-in mode wording");
+
+  step("a contact added after the release gets nothing");
+  const carol = `carol+${Date.now()}@example.com`;
+  await page.goto(`${BASE}/contacts/new`);
+  await page.getByLabel("Name", { exact: true }).fill("Carol Example");
+  await page.getByLabel("Email", { exact: true }).fill(carol);
+  await page.getByRole("button", { name: "Add contact" }).click();
+  await page.waitForURL("**/contacts?saved=1");
+  await cron();
+  assert.equal(mailsTo(carol).filter((m) => m.includes("/access/")).length, 0, "no access link for Carol");
+  const [{ id: carolId }] = await sql`select id from recipients where email=${carol}`;
+  await page.goto(`${BASE}/contacts/${carolId}`);
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Remove" }).click();
+  await page.waitForURL(/\/contacts$/);
 
   step("Anna opens her link");
   const annaLink = await lastLink(anna, "/access/");
@@ -390,6 +432,7 @@ try {
   assert.ok(res.trigger >= 1, JSON.stringify(res));
   await bobPage.goto(await lastLink(bob, "/access/"));
   await bobPage.getByText("ING", { exact: true }).waitFor();
+  assert.ok(mailsTo(bob).at(-1).includes("asked for access"), "claim mode wording in the release email");
   await claimPage.goto(annaClaim);
   await claimPage.getByRole("heading", { name: "The information has been released" }).waitFor();
 
@@ -422,6 +465,9 @@ try {
   await page.waitForURL("**/?deleted=1");
   const left = await sql`select count(*)::int as n from users where email=${owner}`;
   assert.equal(left[0].n, 0);
+
+  step("no Content-Security-Policy violations");
+  assert.deepEqual(cspViolations, []);
 
   console.log("\n✅ ALL E2E CHECKS PASSED");
 } catch (e) {

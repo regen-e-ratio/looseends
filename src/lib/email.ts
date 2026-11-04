@@ -17,7 +17,9 @@ export function emailProvider(): "resend" | "smtp" | "console" {
   return "console";
 }
 
-export async function sendEmail(email: Email): Promise<void> {
+export async function sendEmail(input: Email): Promise<void> {
+  // Subjects and addresses must be one line: user-provided names end up in subjects (no header injection).
+  const email = { ...input, to: input.to.replace(/[\r\n]/g, ""), subject: input.subject.replace(/[\r\n\t]+/g, " ") };
   const provider = emailProvider();
   if (provider === "resend") {
     const res = await fetch("https://api.resend.com/emails", {
@@ -114,7 +116,22 @@ export function reminderEmail(opts: {
   };
 }
 
-export function releaseEmail(opts: { to: string; recipientName: string; ownerName: string; ownerEmail: string; link: string }): Email {
+/** Why the vault was released, in words a recipient understands. */
+function releaseReason(mode: "checkin" | "claim", ownerName: string): string {
+  return mode === "claim"
+    ? `A trusted contact asked for access, and ${ownerName} did not respond within the waiting period they set`
+    : `${ownerName} has not responded to repeated check-in reminders`;
+}
+
+export function releaseEmail(opts: {
+  to: string;
+  recipientName: string;
+  ownerName: string;
+  ownerEmail: string;
+  link: string;
+  mode: "checkin" | "claim";
+}): Email {
+  const reason = releaseReason(opts.mode, opts.ownerName);
   return {
     to: opts.to,
     subject: `${opts.ownerName} left important information for you`,
@@ -123,25 +140,29 @@ export function releaseEmail(opts: { to: string; recipientName: string; ownerNam
         p(
           `${esc(opts.ownerName)} (${esc(opts.ownerEmail)}) used ${esc(APP_NAME)} to leave you important information — such as accounts, subscriptions and personal messages — to be shared if they could no longer check in.`,
         ) +
-        p(`They have not responded to repeated check-in reminders, so this information is now available to you.`) +
+        p(`${esc(reason)}, so this information is now available to you.`) +
         button(opts.link, "View the information") +
         p(`<span style="font-size:13px;color:#78716c">This link is personal to you — please don't forward it. We're sorry if this message reaches you at a difficult time.</span>`),
     ),
-    text: `Dear ${opts.recipientName},\n\n${opts.ownerName} (${opts.ownerEmail}) used ${APP_NAME} to leave you important information to be shared if they could no longer check in. They have not responded to repeated check-in reminders, so it is now available to you:\n\n${opts.link}\n\nThis link is personal to you — please don't forward it.`,
+    text: `Dear ${opts.recipientName},\n\n${opts.ownerName} (${opts.ownerEmail}) used ${APP_NAME} to leave you important information to be shared if they could no longer check in. ${reason}, so it is now available to you:\n\n${opts.link}\n\nThis link is personal to you — please don't forward it.`,
   };
 }
 
-export function releasedNoticeEmail(opts: { to: string; count: number }): Email {
+export function releasedNoticeEmail(opts: { to: string; count: number; mode: "checkin" | "claim" }): Email {
   const link = `${appUrl()}/login`;
+  const why =
+    opts.mode === "claim"
+      ? "A trusted contact asked for access and you didn't reject it in time"
+      : "You didn't respond to your check-in reminders";
   return {
     to: opts.to,
     subject: `Your ${APP_NAME} vault has been released`,
     html: layout(
-      p(`You didn't respond to your check-in reminders, so your vault was released to ${opts.count} trusted contact(s).`) +
+      p(`${why}, so your vault was released to ${opts.count} trusted contact(s).`) +
         p(`If this was a mistake, sign in to revoke their access and reset your timer.`) +
         button(link, "Sign in"),
     ),
-    text: `Your ${APP_NAME} vault was released to ${opts.count} trusted contact(s). If this was a mistake, sign in to revoke access: ${link}`,
+    text: `${why}, so your ${APP_NAME} vault was released to ${opts.count} trusted contact(s). If this was a mistake, sign in to revoke access: ${link}`,
   };
 }
 

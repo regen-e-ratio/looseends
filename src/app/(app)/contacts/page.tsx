@@ -22,6 +22,7 @@ export default async function ContactsPage({ searchParams }: PageProps<"/contact
       {sp.saved && <Alert tone="success">Contact saved.</Alert>}
       {sp.notifyFailed && <Alert tone="warning">The contact was saved, but we couldn&apos;t send them the email. Try “Resend link” later.</Alert>}
       {sp.resent && <Alert tone="success">A new link was emailed. Their previous link no longer works.</Alert>}
+      {sp.limited && <Alert tone="warning">You&apos;ve sent a lot of emails today. Please try again tomorrow.</Alert>}
       {claimMode && (
         <Alert tone="info">
           Claim mode is on: each contact has a personal link to request access if something happens to you. You&apos;ll have{" "}
