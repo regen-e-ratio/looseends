@@ -21,7 +21,7 @@ const stepOneSchema = z.object({
   messageTitle: z.string().trim().max(200).default(""),
   messageBody: z.string().trim().max(20_000).default(""),
   things: z
-    .array(z.object({ title: z.string().trim().min(1).max(200), amount: z.string().trim().max(100).default(""), kind: z.enum(ONBOARDING_KINDS) }))
+    .array(z.object({ title: z.string().trim().min(1).max(200), reference: z.string().trim().max(200).default(""), kind: z.enum(ONBOARDING_KINDS) }))
     .max(30)
     .default([]),
 });
@@ -48,7 +48,8 @@ export async function saveStepOneAction(_prev: StepState, formData: FormData): P
 
   const rows = [
     ...(messageBody ? [{ kind: "message", payload: { title: messageTitle || "To my family", notes: messageBody } }] : []),
-    ...things.map((t) => ({ kind: t.kind, payload: { title: t.title, amount: t.amount } })),
+    // `reference` is how the account can be found (login email, last digits or where it's kept).
+    ...things.map((t) => ({ kind: t.kind, payload: { title: t.title, reference: t.reference } })),
   ].map((r, i) => ({
     userId: user.id,
     // Keep the order they were entered in (lists are sorted by creation time).
@@ -71,7 +72,6 @@ const contactsSchema = z
     z.object({
       name: z.string().trim().min(1, "Every person needs a name.").max(120),
       email: z.preprocess((v) => normalizeEmail(String(v ?? "")), z.email("Please check the email addresses.")),
-      relationship: z.string().trim().max(120).default(""),
     }),
   )
   .min(1, "Add at least one person, or skip this step for now.")
@@ -97,7 +97,6 @@ export async function saveStepTwoAction(_prev: StepState, formData: FormData): P
           userId: user.id,
           name: c.name,
           email: c.email,
-          relationship: c.relationship || null,
           createdAt: new Date(Date.now() + i), // keep the order they were entered in
         })),
       );

@@ -13,16 +13,16 @@ import { ModeCard } from "@/components/switch-form";
 import { Alert, Button, Field, Input, Select, Textarea, cx } from "@/components/ui";
 import { GRACE_OPTIONS, INTERVAL_OPTIONS } from "@/lib/config";
 import { ITEM_KINDS } from "@/lib/items";
-import type { QuickAdd } from "@/lib/onboarding";
+import { IDENTIFY, type QuickAdd } from "@/lib/onboarding";
 
 const PHASES = [
   { title: "Write it down", hint: "A message and what keeps charging you" },
   { title: "Your people", hint: "Who should receive it" },
-  { title: "How we'll know", hint: "Check-ins or a claim" },
+  { title: "How we'll know", hint: "Check-ins or a claim link" },
 ];
 
-type Thing = { id: number; title: string; amount: string; kind: QuickAdd["kind"]; hint: string };
-type Person = { id: number; name: string; email: string; relationship: string };
+type Thing = { id: number; title: string; reference: string; kind: QuickAdd["kind"]; identify: QuickAdd["identify"] };
+type Person = { id: number; name: string; email: string };
 
 let nextId = 1;
 
@@ -35,6 +35,7 @@ function submitWith(dispatch: (fd: FormData) => void, start: (cb: () => void) =>
 
 export function OnboardingFlow(props: {
   name: string;
+  email: string;
   savedItems: number;
   savedContacts: string[];
   suggestions: QuickAdd[];
@@ -79,6 +80,7 @@ export function OnboardingFlow(props: {
           <Section index={0} current={current} done={done[0]} register={register} summary={`${itemCount} item${itemCount === 1 ? "" : "s"} saved to your vault`}>
             <StepOne
               name={props.name}
+              email={props.email}
               suggestions={props.suggestions}
               onSaved={(n) => {
                 setItemCount((c) => c + n);
@@ -225,7 +227,17 @@ function Section({
 
 // ---------- Phase 1 ----------
 
-function StepOne({ name: initialName, suggestions, onSaved }: { name: string; suggestions: QuickAdd[]; onSaved: (n: number) => void }) {
+function StepOne({
+  name: initialName,
+  email,
+  suggestions,
+  onSaved,
+}: {
+  name: string;
+  email: string;
+  suggestions: QuickAdd[];
+  onSaved: (n: number) => void;
+}) {
   const [state, dispatch, pending] = useActionState<StepState, FormData>(saveStepOneAction, {});
   const [, start] = useTransition();
   const [name, setName] = useState(initialName);
@@ -239,7 +251,9 @@ function StepOne({ name: initialName, suggestions, onSaved }: { name: string; su
   }, [state]);
 
   const added = new Set(things.map((t) => t.title));
-  const add = (q: QuickAdd) => setThings((t) => [...t, { id: nextId++, title: q.title, kind: q.kind, hint: q.hint, amount: "" }]);
+  // Most accounts use the person's own address, so pre-fill it; they can change it per row.
+  const add = (q: QuickAdd) =>
+    setThings((t) => [...t, { id: nextId++, title: q.title, kind: q.kind, identify: q.identify, reference: q.identify === "email" ? email : "" }]);
   const update = (id: number, patch: Partial<Thing>) => setThings((t) => t.map((x) => (x.id === id ? { ...x, ...patch } : x)));
 
   return (
@@ -251,7 +265,7 @@ function StepOne({ name: initialName, suggestions, onSaved }: { name: string; su
           name,
           messageTitle,
           messageBody,
-          things: JSON.stringify(things.filter((t) => t.title.trim()).map(({ title, amount, kind }) => ({ title, amount, kind }))),
+          things: JSON.stringify(things.filter((t) => t.title.trim()).map(({ title, reference, kind }) => ({ title, reference, kind }))),
         });
       }}
     >
@@ -291,16 +305,26 @@ function StepOne({ name: initialName, suggestions, onSaved }: { name: string; su
           ))}
           <button
             type="button"
-            onClick={() => add({ title: "", kind: "subscription", hint: "€ / month" })}
+            onClick={() => add({ title: "", kind: "subscription", identify: "email" })}
             className="rounded-full border border-dashed border-stone-400 px-3 py-1.5 text-sm text-stone-600 hover:border-teal-600"
           >
             + Something else
           </button>
         </div>
         {things.length > 0 && (
-          <ul className="divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white">
+          <div className="rounded-xl border border-stone-200 bg-white">
+          <div className="hidden grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.2fr)_1.5rem] gap-2 border-b border-stone-100 px-3 pb-1.5 pt-2.5 text-xs font-medium text-stone-500 sm:grid">
+            <span />
+            <span className="px-3">Service</span>
+            <span className="px-3">How to find the account</span>
+            <span />
+          </div>
+          <ul className="divide-y divide-stone-100">
             {things.map((t) => (
-              <li key={t.id} className="grid grid-cols-[auto_minmax(0,1fr)_7.5rem_auto] items-center gap-2 px-3 py-2 sm:grid-cols-[auto_minmax(0,1fr)_10rem_auto]">
+              <li
+                key={t.id}
+                className="grid grid-cols-[1.5rem_minmax(0,1fr)_1.5rem] items-center gap-x-2 px-3 py-2 sm:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.2fr)_1.5rem]"
+              >
                 <span aria-hidden="true">{ITEM_KINDS[t.kind].icon}</span>
                 <Input
                   aria-label="Name"
@@ -311,11 +335,12 @@ function StepOne({ name: initialName, suggestions, onSaved }: { name: string; su
                   autoFocus={!t.title}
                 />
                 <Input
-                  aria-label={`${t.title || "Item"} cost`}
-                  value={t.amount}
-                  onChange={(e) => update(t.id, { amount: e.target.value })}
-                  placeholder={t.hint}
-                  className="border-transparent shadow-none"
+                  aria-label={`${t.title || "Item"}: ${IDENTIFY[t.identify].label.toLowerCase()}`}
+                  value={t.reference}
+                  onChange={(e) => update(t.id, { reference: e.target.value })}
+                  placeholder={IDENTIFY[t.identify].placeholder}
+                  type={t.identify === "email" ? "email" : "text"}
+                  className="col-start-2 border-transparent text-stone-600 shadow-none sm:col-start-auto"
                 />
                 <button
                   type="button"
@@ -328,6 +353,10 @@ function StepOne({ name: initialName, suggestions, onSaved }: { name: string; su
               </li>
             ))}
           </ul>
+          </div>
+        )}
+        {things.length > 0 && (
+          <p className="text-sm text-stone-500">This is how your people will find each account to cancel it or take it over.</p>
         )}
       </div>
 
@@ -340,7 +369,7 @@ function StepOne({ name: initialName, suggestions, onSaved }: { name: string; su
 
 // ---------- Phase 2 ----------
 
-const emptyPerson = (): Person => ({ id: nextId++, name: "", email: "", relationship: "" });
+const emptyPerson = (): Person => ({ id: nextId++, name: "", email: "" });
 
 function StepTwo({ saved, onSaved, onSkip }: { saved: string[]; onSaved: (names: string[]) => void; onSkip: () => void }) {
   const [state, dispatch, pending] = useActionState<StepState, FormData>(saveStepTwoAction, {});
@@ -361,14 +390,14 @@ function StepTwo({ saved, onSaved, onSkip }: { saved: string[]; onSaved: (names:
       className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
-        submitWith(dispatch, start, { contacts: JSON.stringify(filled.map(({ name, email, relationship }) => ({ name, email, relationship }))) });
+        submitWith(dispatch, start, { contacts: JSON.stringify(filled.map(({ name, email }) => ({ name, email }))) });
       }}
     >
       {state.error && <Alert tone="danger">{state.error}</Alert>}
       {saved.length > 0 && <p className="text-sm text-stone-600">Already added: {saved.join(", ")}</p>}
       <div className="space-y-3">
         {people.map((p, i) => (
-          <div key={p.id} className="grid gap-2 rounded-xl border border-stone-200 bg-white p-3 sm:grid-cols-[1fr_1.3fr_0.9fr_auto] sm:items-center">
+          <div key={p.id} className="grid gap-2 rounded-xl border border-stone-200 bg-white p-3 sm:grid-cols-[1fr_1.4fr_auto] sm:items-center">
             <Input aria-label={`Person ${i + 1} name`} value={p.name} onChange={(e) => update(p.id, { name: e.target.value })} placeholder="Name" maxLength={120} />
             <Input
               aria-label={`Person ${i + 1} email`}
@@ -376,13 +405,6 @@ function StepTwo({ saved, onSaved, onSkip }: { saved: string[]; onSaved: (names:
               value={p.email}
               onChange={(e) => update(p.id, { email: e.target.value })}
               placeholder="Email"
-            />
-            <Input
-              aria-label={`Person ${i + 1} relationship`}
-              value={p.relationship}
-              onChange={(e) => update(p.id, { relationship: e.target.value })}
-              placeholder="Relationship"
-              maxLength={120}
             />
             <button
               type="button"
@@ -433,20 +455,8 @@ function StepThree({ contactCount, defaults }: { contactCount: number; defaults:
       {state.error && <Alert tone="danger">{state.error}</Alert>}
       <fieldset className="grid gap-3 sm:grid-cols-2">
         <legend className="sr-only">How should we know something has happened?</legend>
-        <ModeCard
-          value="checkin"
-          current={mode}
-          onSelect={setMode}
-          title="Email check-ins"
-          body="Now and then we email you. One click says you're OK."
-        />
-        <ModeCard
-          value="claim"
-          current={mode}
-          onSelect={setMode}
-          title="Trusted contacts claim"
-          body="No emails to you. Your people can request access, and you get time to say no."
-        />
+        <ModeCard value="checkin" current={mode} onSelect={setMode} />
+        <ModeCard value="claim" current={mode} onSelect={setMode} />
       </fieldset>
 
       {mode === "checkin" && (

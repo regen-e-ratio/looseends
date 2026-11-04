@@ -4,6 +4,7 @@ import { useActionState, useState, useTransition } from "react";
 import { saveSwitchAction, sendTestReminderAction, type SwitchFormState } from "@/app/actions/settings";
 import { GRACE_OPTIONS, INTERVAL_OPTIONS } from "@/lib/config";
 import { SubmitButton } from "./submit-button";
+import { InfoTip } from "./info-tip";
 import { Alert, Button, Field, Select, cx } from "./ui";
 
 type Mode = "checkin" | "claim";
@@ -61,20 +62,8 @@ export function SwitchForm({
         <fieldset className="space-y-2">
           <legend className="mb-2 text-sm font-medium text-stone-700">How should we know something has happened?</legend>
           <div className="grid gap-3 sm:grid-cols-2">
-            <ModeCard
-              value="checkin"
-              current={mode}
-              onSelect={setMode}
-              title="Email check-ins"
-              body="We email you a one-click check-in every few weeks. If you stop answering, we remind you, then release."
-            />
-            <ModeCard
-              value="claim"
-              current={mode}
-              onSelect={setMode}
-              title="Trusted contacts claim"
-              body="No emails to you. Your contacts get a personal link to request access if something happens. You get time to say no."
-            />
+            <ModeCard value="checkin" current={mode} onSelect={setMode} />
+            <ModeCard value="claim" current={mode} onSelect={setMode} />
           </div>
         </fieldset>
 
@@ -153,18 +142,36 @@ export function SwitchForm({
   );
 }
 
-export function ModeCard({ value, current, onSelect, title, body }: { value: Mode; current: Mode | null; onSelect: (m: Mode) => void; title: string; body: string }) {
+/** The two ways a release can be triggered: a short line on the card, the full story in the tooltip. */
+export const MODE_COPY: Record<Mode, { title: string; body: string; info: string }> = {
+  checkin: {
+    title: "Periodic check-ins",
+    body: "We ask you now and then if you're OK.",
+    info: "Every few weeks we email you an “I'm OK” button. Opening Loose Ends also counts. If you stop answering, we keep reminding you for a while. Only then do your people receive your information.",
+  },
+  claim: {
+    title: "Contacts can claim",
+    body: "Your people get a link to use if something happens.",
+    info: "We never email you on a schedule. Each of your people gets a personal link. If something happens to you, they use it to ask for access. We tell you right away and you have a few days to say no. If you don't, your information goes to them.",
+  },
+};
+
+export function ModeCard({ value, current, onSelect }: { value: Mode; current: Mode | null; onSelect: (m: Mode) => void }) {
   const selected = value === current;
+  const { title, body, info } = MODE_COPY[value];
   return (
     <label
       className={cx(
-        "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition",
+        "relative flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition",
         selected ? "border-teal-700 bg-teal-50/60 ring-1 ring-teal-700" : "border-stone-200 hover:border-stone-300",
       )}
     >
       <input type="radio" name="mode" value={value} checked={selected} onChange={() => onSelect(value)} className="mt-1 accent-teal-700" />
       <span>
-        <span className="block font-medium">{title}</span>
+        <span className="flex items-center gap-2 font-medium">
+          {title}
+          <InfoTip label={`What does “${title}” mean?`}>{info}</InfoTip>
+        </span>
         <span className="mt-1 block text-sm text-stone-600">{body}</span>
       </span>
     </label>

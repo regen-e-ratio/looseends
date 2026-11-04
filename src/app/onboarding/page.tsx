@@ -18,6 +18,7 @@ export default async function OnboardingPage() {
   return (
     <OnboardingFlow
       name={user.name ?? ""}
+      email={user.email}
       savedItems={items.length}
       savedContacts={contacts.map((c) => c.name)}
       suggestions={quickAddSuggestions(user.signupSource)}

@@ -1,29 +1,43 @@
 import type { ItemKind } from "./items";
 
-/** One-tap suggestions in onboarding phase 1. `amount` is only a placeholder hint, never saved by itself. */
-export type QuickAdd = { title: string; kind: Extract<ItemKind, "subscription" | "investment" | "crypto" | "bank">; hint: string };
+/**
+ * How the people you leave behind can find an account. Saved as the item's `reference` field.
+ * - email:    the login email (pre-filled with the user's own address, which most services use)
+ * - digits:   the last digits of an account number
+ * - location: where a device or backup is physically kept
+ */
+export type IdentifyBy = "email" | "digits" | "location";
+
+export const IDENTIFY: Record<IdentifyBy, { label: string; placeholder: string }> = {
+  email: { label: "Account email", placeholder: "Email used for this account" },
+  digits: { label: "Last digits of the account", placeholder: "e.g. •••• 1234" },
+  location: { label: "Where it's kept", placeholder: "e.g. home safe, top shelf" },
+};
+
+/** One-tap suggestions in onboarding phase 1. */
+export type QuickAdd = { title: string; kind: Extract<ItemKind, "subscription" | "investment" | "crypto" | "bank">; identify: IdentifyBy };
 
 const SUBSCRIPTIONS: QuickAdd[] = [
-  { title: "Netflix", kind: "subscription", hint: "€15.99 / month" },
-  { title: "Spotify", kind: "subscription", hint: "€11.99 / month" },
-  { title: "Amazon Prime", kind: "subscription", hint: "€8.99 / month" },
-  { title: "Disney+", kind: "subscription", hint: "€9.99 / month" },
-  { title: "iCloud storage", kind: "subscription", hint: "€2.99 / month" },
-  { title: "Gym membership", kind: "subscription", hint: "€35 / month" },
-  { title: "Mobile phone plan", kind: "subscription", hint: "€20 / month" },
-  { title: "Newspaper", kind: "subscription", hint: "€12 / month" },
-];
+  "Netflix",
+  "Spotify",
+  "Amazon Prime",
+  "Disney+",
+  "iCloud storage",
+  "Gym membership",
+  "Mobile phone plan",
+  "Newspaper",
+].map((title) => ({ title, kind: "subscription", identify: "email" }));
 
 /** Extra suggestions for people who arrived from an audience's ad (users.signupSource). */
 const BY_AUDIENCE: Record<string, QuickAdd[]> = {
   investors: [
-    { title: "Brokerage account", kind: "investment", hint: "≈ €20,000" },
-    { title: "Workplace pension", kind: "investment", hint: "≈ €30,000" },
-    { title: "Savings account", kind: "bank", hint: "≈ €8,000" },
+    { title: "Brokerage account", kind: "investment", identify: "email" },
+    { title: "Workplace pension", kind: "investment", identify: "email" },
+    { title: "Savings account", kind: "bank", identify: "digits" },
   ],
   crypto: [
-    { title: "Hardware wallet", kind: "crypto", hint: "≈ $25,000" },
-    { title: "Exchange account", kind: "crypto", hint: "≈ $3,000" },
+    { title: "Hardware wallet", kind: "crypto", identify: "location" },
+    { title: "Exchange account", kind: "crypto", identify: "email" },
   ],
 };
 

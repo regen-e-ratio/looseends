@@ -97,7 +97,8 @@ try {
   await page.getByLabel("Your name").fill("Joana Example");
   await page.getByLabel("Message", { exact: true }).fill("I love you all. Don't fight over the record collection.");
   await page.getByRole("button", { name: "+ Netflix" }).click();
-  await page.getByLabel("Netflix cost").fill("€15.99 / month");
+  const netflixAccount = page.getByLabel("Netflix: account email");
+  assert.equal(await netflixAccount.inputValue(), owner, "account email is pre-filled with the user's address");
   await page.getByRole("region", { name: "Write it down" }).getByRole("button", { name: "Continue" }).click();
   await page.getByText("2 items saved to your vault").waitFor();
   await page.getByLabel("Person 1 name").waitFor();
@@ -112,7 +113,7 @@ try {
   step("onboarding phase 2: add people");
   await page.getByLabel("Person 1 name").fill("Anna Example");
   await page.getByLabel("Person 1 email").fill(anna);
-  await page.getByLabel("Person 1 relationship").fill("Sister");
+  assert.equal(await page.getByLabel("Person 1 relationship").count(), 0, "no relationship field in onboarding");
   await page.getByRole("button", { name: "+ Add another person" }).click();
   await page.getByLabel("Person 2 name").fill("Bob Example");
   await page.getByLabel("Person 2 email").fill(bob);
@@ -121,9 +122,20 @@ try {
   assert.equal(emailsTo(anna), 0, "nobody is emailed before the mode is chosen");
   await shot("03-onboarding-3");
 
-  step("onboarding phase 3: choose email check-ins and finish");
+  step("onboarding phase 3: tooltips explain the choice; choose check-ins and finish");
   assert.ok(await page.getByRole("button", { name: "Finish setup" }).isDisabled(), "a choice is required");
-  await page.getByRole("radio", { name: /Email check-ins/ }).check();
+  const claimInfo = page.getByRole("button", { name: "What does “Contacts can claim” mean?" });
+  await claimInfo.hover();
+  await page.getByRole("tooltip").filter({ hasText: "We never email you on a schedule" }).waitFor();
+  await shot("03-onboarding-tooltip");
+  await page.mouse.move(0, 0);
+  await page.getByRole("tooltip").filter({ hasText: "We never email you on a schedule" }).waitFor({ state: "hidden" });
+  await claimInfo.click(); // tap on touch screens: stays open, doesn't select the card
+  await page.mouse.move(0, 0);
+  await page.getByRole("tooltip").filter({ hasText: "We never email you on a schedule" }).waitFor();
+  assert.equal(await page.getByRole("radio", { name: /Contacts can claim/ }).isChecked(), false);
+  await page.keyboard.press("Escape");
+  await page.getByRole("radio", { name: /Periodic check-ins/ }).check();
   await page.getByRole("button", { name: "Finish setup" }).click();
   await page.waitForURL("**/dashboard?welcome=1");
   await page.getByText("You're all set").waitFor();
@@ -251,6 +263,7 @@ try {
   await rp.getByRole("heading", { name: "Information from Joana Example" }).waitFor();
   await rp.getByText("Anna, you were the best sister.").waitFor();
   await rp.getByText("I love you all.", { exact: false }).waitFor();
+  await rp.getByText("Login email / username").waitFor(); // how to find the Netflix account
   assert.equal(await rp.getByText("ING", { exact: true }).count(), 0, "bank hidden from Anna");
   await rp.screenshot({ path: `${SHOTS}/09-recipient-anna.png`, fullPage: true });
 
@@ -271,11 +284,11 @@ try {
 
   step("switch to claim mode → contacts get their personal links");
   await page.goto(`${BASE}/settings`);
-  await page.getByRole("radio", { name: /Trusted contacts claim/ }).check();
+  await page.getByRole("radio", { name: /Contacts can claim/ }).check();
   await page.getByText("Saving will email 2 contacts their personal link").waitFor();
   await page.getByRole("button", { name: "Save switch settings" }).click();
   await page.getByText("We emailed 2 contacts their personal link").waitFor();
-  assert.ok(await page.getByRole("radio", { name: /Trusted contacts claim/ }).isChecked(), "selection survives saving");
+  assert.ok(await page.getByRole("radio", { name: /Contacts can claim/ }).isChecked(), "selection survives saving");
   await shot("11-settings-claim");
   const annaClaim = await lastLink(anna, "/claim/");
   const bobClaim = await lastLink(bob, "/claim/");
@@ -335,7 +348,7 @@ try {
   await page.getByRole("button", { name: /revoke access/ }).click();
   await page.getByText("Your contacts can request access").waitFor();
   await page.goto(`${BASE}/settings`);
-  await page.getByRole("radio", { name: /Email check-ins/ }).check();
+  await page.getByRole("radio", { name: /Periodic check-ins/ }).check();
   await page.getByRole("button", { name: "Save switch settings" }).click();
   await page.getByText("Saved. Your timer starts from today.").waitFor();
   await claimPage.goto(annaClaim);
