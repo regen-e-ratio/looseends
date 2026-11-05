@@ -23,10 +23,10 @@ export const SHARED_FAQ: LandingPage["faq"] = [
   },
   {
     q: "How much does it cost?",
-    a: `${PLAN.eur} a ${PLAN.period} in Europe (VAT included) or ${PLAN.usd} a ${PLAN.period} in the US (plus sales tax). One plan with everything, no limits. Cancel anytime, and ask for a full refund within ${PLAN.refundDays} days if it's not for you.`,
+    a: `Writing your vault and adding your people is free. Turning on the release switch — the part that delivers it to them — is ${PLAN.eur} a ${PLAN.period} in Europe (VAT included) or ${PLAN.usd} a ${PLAN.period} in the US (plus sales tax). Cancel anytime, and ask for a full refund within ${PLAN.refundDays} days if it's not for you.`,
   },
   {
     q: "What happens if my payments stop?",
-    a: "Your vault becomes read-only, but your release switch keeps working with the settings you chose. If your card stops working because you're gone, your instructions still reach your people. We never charge your contacts anything.",
+    a: "Your release switch keeps working with the settings you chose — if your card stops working because you're gone, your instructions still reach your people. You'd only need to renew to turn the switch back on after switching it off. We never charge your contacts anything.",
   },
 ];

@@ -9,7 +9,7 @@ A private "dead man's switch" vault. People record their subscriptions, bank acc
 ## How it works
 
 1. **Sign in with email**: passwordless magic links. Signing up and signing in are the same flow.
-   **Subscription required**: new accounts land on `/subscribe` (one plan, €39/$39 a year, Paddle checkout) before anything else.
+   Accounts, the vault and contacts are **free**. A subscription (one plan, €39/$39 a year, Paddle checkout at `/subscribe`) is only needed to **turn the release switch on**.
    New subscribers then go through **onboarding** (`/onboarding`), until they finish or skip it (`users.onboarded_at`). It has 3 phases: (1) name, a message and one-tap subscriptions, plus audience-specific suggestions for people who arrived from an ad (`src/lib/onboarding.ts`); (2) trusted contacts, with no emails sent yet; (3) choose email check-ins or contacts claim, which switches it on and sends the matching emails. Progress is derived from saved data, so a reload resumes at the right phase.
 2. **Vault**: items of 8 kinds (subscription, bank, investment, crypto wallet, insurance, online account, other, message). Each item is just a name, one "how to find it" field (account email, last digits, policy number…) and free-text notes, with an ideas tooltip (`src/lib/items.ts`). Contents are encrypted with AES-256-GCM before being stored.
    Everything is seen, added and edited on **one page**, `/vault`. The selection lives in the URL (`?item=<id>` / `?new=<kind>`), so switching is instant and back/forward work. The dashboard shows a compact overview.
@@ -21,7 +21,8 @@ A private "dead man's switch" vault. People record their subscriptions, bank acc
    - After a release, the owner can sign in and **revoke & reset**, which invalidates all access links.
 5. A daily Vercel Cron (`vercel.json`) calls `/api/cron/check-switches` (protected by `CRON_SECRET`).
 6. **Billing** (`src/lib/billing.ts`, rules in `billing-rules.ts`, unit-tested). Paddle is the merchant of record: it charges customers and handles EU VAT, US sales tax, invoices and refunds.
-   - Access levels: **member** (`active`, `trialing`, `past_due` while Paddle retries a failed payment) = full use; **frozen** (subscription `canceled`/`paused`) = vault and contacts read-only, but the **release switch keeps running** (when someone dies their card stops working; their instructions must still arrive), and the owner can still check in, turn the switch off, renew or delete the account; **none** (never subscribed) = only `/subscribe`.
+   - Turning the switch on (settings, or onboarding phase 3) needs a **member** (`active`, `trialing`, or `past_due` while Paddle retries a failed payment). Without one, the choices are saved and the user goes to `/subscribe`; paying turns the switch on with those settings (`afterPayment` in `src/app/actions/billing.ts`).
+   - When a subscription ends (**frozen**: `canceled`/`paused`), a switch that is on **keeps running** (when someone dies their card stops working; their instructions must still arrive). Everything else stays free; only turning the switch back on needs a renewal.
    - Paddle's webhook (`/api/paddle/webhook`, HMAC-verified) is the source of truth. Right after checkout the subscribe page also asks the server to fetch the transaction from Paddle's API, so access starts at once. Late or out-of-order webhooks are ignored (`shouldApply`), and an old subscription ending never removes the access a newer one gives.
    - Deleting an account cancels its subscription first; if Paddle can't be reached, nothing is deleted.
    - The subscribe page is the only page whose Content-Security-Policy allows Paddle's script and checkout iframe; it reloads itself if reached by in-app navigation.
@@ -49,7 +50,7 @@ src/
     api/cron/check-switches/     daily job
     api/health/                  config self-check (booleans only)
     api/paddle/webhook/          Paddle subscription events (signature-verified)
-    subscribe/                   the paywall: Paddle overlay checkout, then confirmation
+    subscribe/                   activate the release switch: Paddle overlay checkout, then confirmation
     terms/, privacy/, refunds/   legal pages Paddle requires (operator from LEGAL_NAME / LEGAL_ADDRESS)
     actions/                     server actions (all re-check session + ownership)
   lib/
@@ -78,7 +79,7 @@ Emails (including sign-in links) are printed to the terminal when no email provi
 Edit `src/db/schema.ts`, then run `npm run db:generate`, and commit the new file in `drizzle/`. It is applied on the next deploy.
 
 ### End-to-end test
-Runs the full lifecycle (sign-up → paywall → signed Paddle webhooks → items → contacts → per-contact sharing → switch → simulated missed check-ins → release → recipient view → revoke → delete account) against a production build:
+Runs the full lifecycle (sign-up → items → contacts → per-contact sharing → switch → simulated missed check-ins → release → recipient view → revoke → switch needs a subscription → signed Paddle webhooks → lapsed and renewed subscriptions → delete account) against a production build:
 ```bash
 npm run build && npm start > /tmp/server.log 2>&1 &
 set -a; . ./.env.local; set +a

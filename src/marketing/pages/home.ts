@@ -14,7 +14,7 @@ export const home: LandingPage = {
     subheadline:
       "If something happened to you tomorrow, would anyone know about your bank accounts, investments, subscriptions or last wishes? Loose Ends is a private place to write them down. If you stop checking in, we pass them on to the people you chose — and only them.",
     cta: "Start your vault",
-    bullets: ["Everything included", "Encrypted", "No passwords stored"],
+    bullets: ["Free to start", "Encrypted", "No passwords stored"],
   },
   preview: {
     ownerName: "Alex",

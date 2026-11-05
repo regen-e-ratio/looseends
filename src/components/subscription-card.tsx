@@ -1,6 +1,7 @@
 import { openBillingPortalAction } from "@/app/actions/billing";
 import type { User } from "@/db/schema";
 import { accessLevel } from "@/lib/billing-rules";
+import { PLAN } from "@/lib/config";
 import { SubmitButton } from "./submit-button";
 import { Alert, Badge, Card, formatDate } from "./ui";
 
@@ -20,11 +21,17 @@ export function SubscriptionCard({ user, portalUnavailable }: { user: User; port
   }
   if (access === "member" && user.billingCancelsAt) {
     badge = <Badge tone="amber">Cancelled</Badge>;
-    text = `Your subscription ends on ${formatDate(user.billingCancelsAt)}. After that your vault becomes read-only, but your release switch keeps running.`;
+    text = `Your subscription ends on ${formatDate(user.billingCancelsAt)}. After that your release switch keeps running, but you can't turn it back on once it's off.`;
   }
   if (access === "frozen") {
     badge = <Badge tone="red">Ended</Badge>;
-    text = `Your subscription ended${ends ? ` on ${formatDate(ends)}` : ""}. Your vault is read-only, but your release switch keeps running.`;
+    text = `Your subscription ended${ends ? ` on ${formatDate(ends)}` : ""}. ${
+      user.switchEnabled ? "Your release switch keeps running, but you'll need to renew to turn it back on if you turn it off." : "Renew to turn your release switch on."
+    }`;
+  }
+  if (access === "none") {
+    badge = <Badge tone="neutral">Not subscribed</Badge>;
+    text = `Writing your vault and adding contacts is free. Turning on the release switch, which sends it to your people, is ${PLAN.eur} a ${PLAN.period} (${PLAN.usd} in the US).`;
   }
 
   return (
@@ -40,10 +47,10 @@ export function SubscriptionCard({ user, portalUnavailable }: { user: User; port
         </Alert>
       )}
       <div className="mt-4 flex flex-wrap gap-2">
-        {access === "frozen" && (
+        {access !== "member" && (
           // A full page load: the subscribe page needs its own Content-Security-Policy for Paddle.
           <a href="/subscribe" className="inline-flex items-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-800">
-            Renew
+            {access === "none" ? "Subscribe" : "Renew"}
           </a>
         )}
         {user.billingCustomerId && (

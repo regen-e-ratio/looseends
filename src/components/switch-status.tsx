@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { User } from "@/db/schema";
 import { checkInAction, resetAfterReleaseAction } from "@/app/actions/settings";
 import { isClaimPending, nextCheckInDue, releaseDate } from "@/lib/switch";
+import { accessLevel } from "@/lib/billing-rules";
+import { PLAN } from "@/lib/config";
 import { SubmitButton } from "./submit-button";
 import { cx, daysUntil, formatDate, LinkButton } from "./ui";
 
@@ -18,6 +20,23 @@ export function SwitchStatus({ user, recipientCount, claimantName }: { user: Use
             I&apos;m OK — revoke access &amp; restart
           </SubmitButton>
         </form>
+      </Panel>
+    );
+  }
+
+  if (!user.switchEnabled && recipientCount > 0 && accessLevel(user) !== "member") {
+    return (
+      <Panel tone="amber" title="Your vault is ready — activate your release switch" icon="⏸️">
+        <p>
+          Everything is written down, but nothing will reach your people until the switch is on. Activating it is{" "}
+          {PLAN.eur} a {PLAN.period} ({PLAN.usd} in the US).
+        </p>
+        <div className="mt-4">
+          {/* A full page load: the subscribe page needs its own Content-Security-Policy for Paddle. */}
+          <a href="/subscribe" className="inline-flex items-center rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-800">
+            Activate my switch
+          </a>
+        </div>
       </Panel>
     );
   }

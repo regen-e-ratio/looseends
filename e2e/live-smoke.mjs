@@ -71,7 +71,7 @@ await check("private pages redirect anonymous visitors to /login", async () => {
 });
 
 await check("pricing and the legal pages Paddle requires are public", async () => {
-  assert.match(await (await get("/")).text(), /One plan\. Everything included\./);
+  assert.match(await (await get("/")).text(), /Free to write\. One plan to switch it on\./);
   for (const p of ["/terms", "/privacy", "/refunds"]) assert.equal((await get(p)).status, 200, p);
   assert.match(await (await get("/terms")).text(), /Paddle\.com is the Merchant of Record/);
 });

@@ -33,7 +33,8 @@ export default function TermsPage() {
 
       <h2>Subscription and payment</h2>
       <p>
-        Loose Ends has one plan, billed yearly in advance. The current price is shown on our website and at checkout:{" "}
+        Creating an account, writing your vault and adding contacts are free. Turning on the release switch needs a
+        subscription. Loose Ends has one plan, billed yearly in advance. The current price is shown on our website and at checkout:{" "}
         {PLAN.eur} a year in the EU, including VAT, and {PLAN.usd} a year in the US, plus applicable sales tax. Prices in other
         currencies are shown at checkout.
       </p>
@@ -44,8 +45,8 @@ export default function TermsPage() {
       <ul>
         <li>Your subscription renews automatically each year until you cancel it.</li>
         <li>
-          You can cancel at any time from Settings → Manage subscription. You keep full access until the end of the period you
-          paid for.
+          You can cancel at any time from Settings → Manage subscription. Your subscription runs until the end of the period
+          you paid for.
         </li>
         <li>If we change the price, we will tell you by email at least 30 days before your next renewal.</li>
         <li>
@@ -55,10 +56,10 @@ export default function TermsPage() {
 
       <h2>If your subscription ends</h2>
       <p>
-        If your subscription ends or a payment fails for good, your vault becomes read-only: you can read it, but not change it.
-        Your release switch keeps running with the settings you had, so your instructions still reach your contacts if something
-        happens to you. You can turn the switch off, renew, or delete your account at any time. We never charge your contacts
-        anything.
+        If your subscription ends or a payment fails for good, a release switch that is on keeps running with the settings you
+        had, so your instructions still reach your contacts if something happens to you. You can still edit your vault, turn the
+        switch off or delete your account at any time, but turning the switch back on needs an active subscription. We never
+        charge your contacts anything.
       </p>
 
       <h2>What we can&apos;t promise</h2>

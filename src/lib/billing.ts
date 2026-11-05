@@ -12,6 +12,9 @@ import {
   type PaddleSubscription,
 } from "./billing-rules";
 
+import { accessLevel } from "./billing-rules";
+import { activateSwitch } from "./switch";
+
 export { accessLevel, type Access } from "./billing-rules";
 
 const { users } = schema;
@@ -109,6 +112,7 @@ export async function applySubscription(userId: string, sub: PaddleSubscription)
     const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
     if (!user) return null;
     if (!shouldApply(storedFields(user), incoming)) return user;
+    const wasMember = accessLevel(user) === "member";
     const [saved] = await db
       .update(users)
       .set(incoming)
@@ -120,7 +124,11 @@ export async function applySubscription(userId: string, sub: PaddleSubscription)
         ),
       )
       .returning();
-    if (saved) return saved;
+    if (saved) {
+      // Paying is how the release switch gets turned on: do it with the settings the user already chose.
+      if (!wasMember && accessLevel(saved) === "member" && saved.onboardedAt && !saved.switchEnabled) await activateSwitch(userId);
+      return saved;
+    }
   }
   throw new Error("Subscription update kept conflicting");
 }

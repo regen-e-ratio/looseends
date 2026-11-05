@@ -20,14 +20,14 @@ export default function RefundsPage() {
       </p>
       <h2>After {PLAN.refundDays} days</h2>
       <p>
-        You can cancel at any time from Settings → Manage subscription, and you won&apos;t be charged again. You keep full access
-        until the end of the period you paid for. Payments older than {PLAN.refundDays} days are not refunded, except where the
+        You can cancel at any time from Settings → Manage subscription, and you won&apos;t be charged again. Your subscription
+        runs until the end of the period you paid for. Payments older than {PLAN.refundDays} days are not refunded, except where the
         law requires it or our terms promise it (for example, if we close the service).
       </p>
       <h2>What happens after a refund</h2>
       <p>
-        Your subscription ends. Your vault becomes read-only and your release switch keeps running, unless you turn it off or
-        delete your account.
+        Your subscription ends. A release switch that is on keeps running unless you turn it off or delete your account; turning
+        it back on needs a new subscription.
       </p>
     </LegalPage>
   );

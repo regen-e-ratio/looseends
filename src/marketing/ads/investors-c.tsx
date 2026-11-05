@@ -17,7 +17,7 @@ function ElectricPoster({ from }: AdProps) {
       className={grotesk.className}
       logo={{ bg: "#FFFFFF", fg: "#2148FF", text: "#FFFFFF" }}
       style={{ background: "#2148FF", color: "#FFFFFF" }}
-      footer="€39 a year · Takes 15 minutes · We never ask for logins"
+      footer="Free to start · Takes 15 minutes · We never ask for logins"
     >
       <div className="grid w-full items-center gap-8 lg:grid-cols-[1.2fr_0.8fr]">
         <div>

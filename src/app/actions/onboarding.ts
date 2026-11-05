@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { normalizeEmail, requireMember } from "@/lib/auth";
+import { canTurnOnSwitch, normalizeEmail, requireUser } from "@/lib/auth";
 import { GRACE_OPTIONS, INTERVAL_OPTIONS } from "@/lib/config";
 import { contactAddedEmail, sendEmail } from "@/lib/email";
 import { ONBOARDING_KINDS } from "@/lib/onboarding";
@@ -38,7 +38,7 @@ function parseJson(value: FormDataEntryValue | null): unknown {
 
 /** Phase 1: name, an optional message and quick-added subscriptions / accounts. */
 export async function saveStepOneAction(_prev: StepState, formData: FormData): Promise<StepState> {
-  const user = await requireMember();
+  const user = await requireUser();
   const parsed = stepOneSchema.safeParse({
     name: formData.get("name") ?? "",
     messageTitle: formData.get("messageTitle") ?? "",
@@ -81,7 +81,7 @@ const contactsSchema = z
 
 /** Phase 2: trusted contacts. No emails yet — what they receive depends on the mode chosen in phase 3. */
 export async function saveStepTwoAction(_prev: StepState, formData: FormData): Promise<StepState> {
-  const user = await requireMember();
+  const user = await requireUser();
   const parsed = contactsSchema.safeParse(parseJson(formData.get("contacts")));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please check the form." };
 
@@ -109,7 +109,7 @@ export async function saveStepTwoAction(_prev: StepState, formData: FormData): P
 
 /** Phase 3: choose how a release is triggered, switch it on (when there are contacts) and finish. */
 export async function finishOnboardingAction(_prev: StepState, formData: FormData): Promise<StepState> {
-  const user = await requireMember();
+  const user = await requireUser();
   const mode = formData.get("mode") === "claim" ? "claim" : "checkin";
   const interval = Number(formData.get("interval"));
   const grace = Number(formData.get("grace"));
@@ -117,12 +117,14 @@ export async function finishOnboardingAction(_prev: StepState, formData: FormDat
     return { error: "Please choose valid options." };
   }
   const contacts = await db.select().from(recipients).where(eq(recipients.userId, user.id));
+  // Turning the switch on needs a subscription; without one the choices are saved and paying turns it on.
+  const member = canTurnOnSwitch(user);
 
   const [saved] = await db
     .update(users)
     .set({
       switchMode: mode,
-      switchEnabled: contacts.length > 0,
+      switchEnabled: member && contacts.length > 0,
       checkInIntervalDays: interval,
       gracePeriodDays: grace,
       onboardedAt: new Date(),
@@ -148,12 +150,12 @@ export async function finishOnboardingAction(_prev: StepState, formData: FormDat
       }
     }
   }
-  redirect("/dashboard?welcome=1");
+  redirect(!member && contacts.length > 0 ? "/subscribe?welcome=1" : "/dashboard?welcome=1");
 }
 
 /** "Skip setup": never show onboarding again; the dashboard checklist takes over. */
 export async function skipOnboardingAction() {
-  const user = await requireMember();
+  const user = await requireUser();
   await db.update(users).set({ onboardedAt: new Date() }).where(eq(users.id, user.id));
   redirect("/dashboard");
 }

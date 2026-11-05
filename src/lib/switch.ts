@@ -209,6 +209,25 @@ export async function sendClaimInvite(owner: User, r: Recipient): Promise<void> 
 }
 
 /** Sends claim links to every contact who hasn't received one. Returns how many were sent / failed. */
+/**
+ * Turns the switch on with the user's saved settings, if they have trusted contacts. Starts a fresh schedule and,
+ * in claim mode, emails contacts their links. Returns false when there is nobody to send to yet.
+ */
+export async function activateSwitch(userId: string): Promise<boolean> {
+  const contacts = await db.select({ id: recipients.id }).from(recipients).where(eq(recipients.userId, userId));
+  if (contacts.length === 0) return false;
+  // Only the call that actually flips it does the rest (the webhook and the checkout page may both get here).
+  const [saved] = await db
+    .update(users)
+    .set({ switchEnabled: true })
+    .where(and(eq(users.id, userId), eq(users.switchEnabled, false)))
+    .returning();
+  if (!saved) return false;
+  await restartSchedule(saved);
+  if (saved.switchMode === "claim") await sendMissingClaimInvites(saved);
+  return true;
+}
+
 export async function sendMissingClaimInvites(owner: User): Promise<{ sent: number; failed: number }> {
   const missing = await db
     .select()

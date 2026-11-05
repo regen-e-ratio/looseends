@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { normalizeEmail, requireMember } from "@/lib/auth";
+import { normalizeEmail, requireUser } from "@/lib/auth";
 import { encryptNullable } from "@/lib/crypto";
 import { contactAddedEmail, sendEmail } from "@/lib/email";
 import { dropClaim, revokeClaimLink, sendClaimInvite } from "@/lib/switch";
@@ -22,7 +22,7 @@ const contactSchema = z.object({
 });
 
 export async function saveContactAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const user = await requireMember();
+  const user = await requireUser();
   const id = String(formData.get("id") ?? "") || null;
   const parsed = contactSchema.safeParse({
     name: formData.get("name"),
@@ -89,7 +89,7 @@ export async function saveContactAction(_prev: FormState, formData: FormData): P
 }
 
 export async function deleteContactAction(formData: FormData) {
-  const user = await requireMember();
+  const user = await requireUser();
   const id = String(formData.get("id") ?? "");
   const deleted = await db.delete(recipients).where(and(eq(recipients.id, id), eq(recipients.userId, user.id))).returning({ id: recipients.id });
   // Removing the person who made a pending claim cancels that claim.
@@ -98,7 +98,7 @@ export async function deleteContactAction(formData: FormData) {
 }
 
 export async function resendClaimLinkAction(formData: FormData) {
-  const user = await requireMember();
+  const user = await requireUser();
   const id = String(formData.get("id") ?? "");
   if (!(user.switchEnabled && user.switchMode === "claim")) redirect("/contacts");
   const r = await db.query.recipients.findFirst({ where: and(eq(recipients.id, id), eq(recipients.userId, user.id)) });

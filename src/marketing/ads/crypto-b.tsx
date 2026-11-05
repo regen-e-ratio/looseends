@@ -12,7 +12,7 @@ function SplitKnowledge({ from }: AdProps) {
           "radial-gradient(50% 60% at 15% 20%, rgba(192,38,211,.35), transparent 70%), radial-gradient(50% 60% at 90% 80%, rgba(34,211,238,.28), transparent 70%), #0E0726",
         color: "#F5F3FF",
       }}
-      footer="€39 a year · No seed phrases, ever · Revoke access in one click"
+      footer="Free to start · No seed phrases, ever · Revoke access in one click"
     >
       <div className="grid w-full items-center gap-10 lg:grid-cols-[1fr_1fr] lg:gap-16">
         <div>

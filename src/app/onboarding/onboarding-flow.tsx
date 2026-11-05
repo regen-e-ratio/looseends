@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/onboarding";
 import { LogoMark } from "@/components/logo";
 import { ModeCard } from "@/components/switch-form";
+import { PLAN } from "@/lib/config";
 import { Alert, Button, Field, Input, Select, Textarea, cx } from "@/components/ui";
 import { GRACE_OPTIONS, INTERVAL_OPTIONS } from "@/lib/config";
 import { ITEM_KINDS } from "@/lib/items";
@@ -41,6 +42,8 @@ export function OnboardingFlow(props: {
   suggestions: QuickAdd[];
   stepOneDone: boolean;
   defaults: { interval: number; grace: number };
+  /** Has a subscription, so finishing turns the switch on directly (otherwise: subscribe next). */
+  canTurnOn: boolean;
 }) {
   const [done, setDone] = useState([props.stepOneDone, props.savedContacts.length > 0, false]);
   const [current, setCurrent] = useState(() => (props.stepOneDone ? (props.savedContacts.length > 0 ? 2 : 1) : 0));
@@ -111,7 +114,7 @@ export function OnboardingFlow(props: {
             />
           </Section>
           <Section index={2} current={current} done={false} register={register} last>
-            <StepThree contactCount={contactNames.length} defaults={props.defaults} />
+            <StepThree contactCount={contactNames.length} defaults={props.defaults} canTurnOn={props.canTurnOn} />
           </Section>
         </div>
       </main>
@@ -441,7 +444,15 @@ function StepTwo({ saved, onSaved, onSkip }: { saved: string[]; onSaved: (names:
 
 // ---------- Phase 3 ----------
 
-function StepThree({ contactCount, defaults }: { contactCount: number; defaults: { interval: number; grace: number } }) {
+function StepThree({
+  contactCount,
+  defaults,
+  canTurnOn,
+}: {
+  contactCount: number;
+  defaults: { interval: number; grace: number };
+  canTurnOn: boolean;
+}) {
   const [state, dispatch, pending] = useActionState<StepState, FormData>(finishOnboardingAction, {});
   const [, start] = useTransition();
   const [mode, setMode] = useState<"checkin" | "claim" | null>(null);
@@ -506,8 +517,13 @@ function StepThree({ contactCount, defaults }: { contactCount: number; defaults:
         <p className="text-sm text-stone-600">It stays off until you add someone. You can do that anytime from your vault.</p>
       )}
 
+      {mode && contactCount > 0 && !canTurnOn && (
+        <p className="text-sm text-stone-600">
+          Next, activate your switch: {PLAN.eur} a {PLAN.period} ({PLAN.usd} in the US). Until then, nothing is sent to anyone.
+        </p>
+      )}
       <Button type="submit" disabled={pending || !mode} className="px-6 py-2.5">
-        {pending ? "Finishing…" : "Finish setup"}
+        {pending ? "Finishing…" : contactCount > 0 && !canTurnOn ? "Finish and activate" : "Finish setup"}
       </Button>
     </form>
   );

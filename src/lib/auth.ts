@@ -100,17 +100,16 @@ export async function requireUser() {
   return user;
 }
 
-/** Where a signed-in user belongs: subscribe first, then the guided setup, then the dashboard. */
+/** Where a signed-in user belongs: the guided setup first, then the dashboard. */
 export function startPage(user: User): string {
-  const access = accessLevel(user);
-  if (access === "none") return "/subscribe";
-  if (!user.onboardedAt) return access === "member" ? "/onboarding" : "/subscribe";
-  return "/dashboard";
+  return user.onboardedAt ? "/dashboard" : "/onboarding";
 }
 
-/** A signed-in user with a current subscription; everyone else goes to the subscribe page. */
-export async function requireMember() {
-  const user = await requireUser();
-  if (accessLevel(user) !== "member") redirect("/subscribe");
-  return user;
+/**
+ * Turning the release switch on needs a subscription (everything else is free). A switch that is already on
+ * keeps running when a subscription ends: a card stops working when its owner dies, and that must never
+ * stop their instructions from arriving.
+ */
+export function canTurnOnSwitch(user: User): boolean {
+  return accessLevel(user) === "member";
 }

@@ -19,7 +19,8 @@ export const INTERVAL_OPTIONS = [7, 14, 30, 60, 90, 180] as const;
 export const GRACE_OPTIONS = [3, 7, 14, 30] as const;
 
 /**
- * The one plan, as the website describes it. Prices are charged by Paddle (see SETUP.md): keep these in sync
+ * The one plan, as the website describes it. Writing a vault and adding contacts are free; the plan turns the release
+ * switch on. Prices are charged by Paddle (see SETUP.md): keep these in sync
  * with the price in Paddle. EU prices include VAT; US sales tax is added at checkout.
  */
 export const PLAN = {
@@ -27,9 +28,9 @@ export const PLAN = {
   usd: "$39",
   period: "year",
   includes: [
-    "Unlimited accounts, subscriptions, wallets and messages",
-    "Unlimited trusted contacts",
-    "Check-in reminders, or let your contacts claim",
+    "Your release switch: check-in reminders, or let your contacts claim",
+    "Your vault delivered to the right people, each seeing only what you chose",
+    "Unlimited accounts, subscriptions, wallets, messages and contacts",
     "Encrypted, private, never sold or shared",
   ],
   refundDays: 14,

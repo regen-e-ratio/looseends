@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { endSession, requireMember, requireUser } from "@/lib/auth";
+import { canTurnOnSwitch, endSession, requireUser } from "@/lib/auth";
 import {
   confirmAlive,
   isClaimPending,
@@ -24,7 +24,7 @@ const { users, recipients } = schema;
 
 
 export async function saveNameAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const user = await requireMember();
+  const user = await requireUser();
   const name = oneLineName().safeParse(formData.get("name") ?? "");
   if (!name.success) return { fieldErrors: { name: ["Please enter your name."] } };
   await db.update(users).set({ name: name.data }).where(eq(users.id, user.id));
@@ -35,7 +35,7 @@ export async function saveNameAction(_prev: FormState, formData: FormData): Prom
 export type SwitchFormState = FormState & { ok?: boolean; message?: string };
 
 export async function saveSwitchAction(_prev: SwitchFormState, formData: FormData): Promise<SwitchFormState> {
-  const user = await requireMember();
+  const user = await requireUser();
   const enabled = formData.get("enabled") === "on";
   const mode = formData.get("mode") === "claim" ? "claim" : "checkin";
   const interval = Number(formData.get("interval"));
@@ -46,6 +46,11 @@ export async function saveSwitchAction(_prev: SwitchFormState, formData: FormDat
   if (enabled) {
     const count = (await db.select({ id: recipients.id }).from(recipients).where(eq(recipients.userId, user.id))).length;
     if (count === 0) return { error: "Add at least one trusted contact before turning the switch on." };
+  }
+  // Turning it on needs a subscription: keep the choices, then subscribe (paying turns it on).
+  if (enabled && !user.switchEnabled && !canTurnOnSwitch(user)) {
+    await db.update(users).set({ switchMode: mode, checkInIntervalDays: interval, gracePeriodDays: grace }).where(eq(users.id, user.id));
+    redirect("/subscribe");
   }
   // Leaving claim mode or switching off is the owner's answer to a pending claim: reject it (the contact is told).
   if (isClaimPending(user) && (mode !== "claim" || !enabled)) await confirmAlive(user.id);
@@ -70,21 +75,8 @@ export async function saveSwitchAction(_prev: SwitchFormState, formData: FormDat
   return { ok: true, message };
 }
 
-/**
- * Turns the release switch off. Works without a subscription too: a lapsed account keeps its switch running,
- * and its owner must always be able to stop it.
- */
-export async function turnOffSwitchAction() {
-  const user = await requireUser();
-  if (isClaimPending(user)) await confirmAlive(user.id);
-  const [saved] = await db.update(users).set({ switchEnabled: false }).where(eq(users.id, user.id)).returning();
-  if (saved) await restartSchedule(saved);
-  revalidatePath("/", "layout");
-  redirect("/settings?switchOff=1");
-}
-
 export async function sendTestReminderAction(): Promise<SwitchFormState> {
-  const user = await requireMember();
+  const user = await requireUser();
   try {
     await assertUserEmailAllowed(user.id);
     await sendReminder(user, { test: true });

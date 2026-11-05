@@ -4,13 +4,13 @@ import { deleteContactAction } from "@/app/actions/contacts";
 import { ContactForm } from "@/components/contact-form";
 import { SubmitButton } from "@/components/submit-button";
 import { PageHeader } from "@/components/ui";
-import { requireMember } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { getRecipient } from "@/lib/vault";
 
 export const metadata = { title: "Edit contact" };
 
 export default async function EditContactPage({ params }: PageProps<"/contacts/[id]">) {
-  const user = await requireMember();
+  const user = await requireUser();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const c = await getRecipient(user.id, id);

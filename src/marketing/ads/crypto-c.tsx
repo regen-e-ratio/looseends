@@ -8,7 +8,7 @@ function OrangePill({ from }: AdProps) {
       className={grotesk.className}
       logo={{ bg: "#0A0A0A", fg: "#F7931A", text: "#0A0A0A" }}
       style={{ background: "#F7931A", color: "#0A0A0A" }}
-      footer="€39 a year · No seed phrases, ever · No wallet connections"
+      footer="Free to start · No seed phrases, ever · No wallet connections"
     >
       <div className="grid w-full items-center gap-10 lg:grid-cols-[1.25fr_0.75fr]">
         <div>

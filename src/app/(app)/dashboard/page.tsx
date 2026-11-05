@@ -28,6 +28,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
       {sp.welcome && <Alert tone="success">You&apos;re all set. Add more to your vault whenever something comes to mind.</Alert>}
       {sp.saved && <Alert tone="success">Saved.</Alert>}
+      {sp.activated && <Alert tone="success">Thank you! Your release switch is on.</Alert>}
       {sp.checkedIn && <Alert tone="success">Thanks — you&apos;re checked in and your timer has been reset.</Alert>}
       {sp.rejected && <Alert tone="success">Request rejected. We&apos;ve let your contact know you&apos;re OK.</Alert>}
 

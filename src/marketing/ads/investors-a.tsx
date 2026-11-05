@@ -19,7 +19,7 @@ function MoneyMap({ from }: AdProps) {
           "radial-gradient(60% 60% at 80% 30%, rgba(198,244,50,.16), transparent 70%), linear-gradient(#0B0F14, #0B0F14)",
         color: "#F4F7FA",
       }}
-      footer="€39 a year · Takes 15 minutes · We never ask for logins"
+      footer="Free to start · Takes 15 minutes · We never ask for logins"
     >
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07]"

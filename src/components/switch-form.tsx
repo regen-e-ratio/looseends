@@ -15,6 +15,7 @@ export function SwitchForm({
   interval,
   grace,
   contactCount,
+  canTurnOn = true,
   contactsWithoutLink,
   claimPending,
 }: {
@@ -23,6 +24,8 @@ export function SwitchForm({
   interval: number;
   grace: number;
   contactCount: number;
+  /** False without a subscription: turning it on saves the choices and goes to the subscribe page. */
+  canTurnOn?: boolean;
   contactsWithoutLink: number;
   claimPending: boolean;
 }) {
@@ -55,7 +58,10 @@ export function SwitchForm({
           <input type="checkbox" name="enabled" checked={on} onChange={(e) => setOn(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-700" />
           <span>
             <span className="font-medium">Switch is {on ? "on" : "off"}</span>
-            <span className="block text-sm text-stone-500">When it&apos;s off, nothing is ever sent to your trusted contacts.</span>
+            <span className="block text-sm text-stone-500">
+              When it&apos;s off, nothing is ever sent to your trusted contacts.
+              {!canTurnOn && !enabled && " Turning it on needs a subscription (€39 a year)."}
+            </span>
           </span>
         </label>
 
@@ -127,7 +133,7 @@ export function SwitchForm({
         {willRejectClaim && <Alert tone="warning">Saving will reject the pending access request and tell the contact you&apos;re OK.</Alert>}
 
         <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save switch settings"}
+          {saving ? "Saving…" : on && !enabled && !canTurnOn ? "Save and subscribe to turn it on" : "Save switch settings"}
         </Button>
       </form>
 

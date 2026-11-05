@@ -3,14 +3,13 @@ import { Logo } from "@/components/logo";
 import { NavLinks } from "@/components/nav-links";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { requireUser, startPage } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { accessLevel } from "@/lib/billing";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
-  // Subscribe first, then the guided setup, then the app. Lapsed accounts stay in, read-only.
-  const start = startPage(user);
-  if (start !== "/dashboard") redirect(start);
+  // First-time users go through the guided setup before anything else.
+  if (!user.onboardedAt) redirect("/onboarding");
   const access = accessLevel(user);
   return (
     <div className="flex flex-1 flex-col">
@@ -26,10 +25,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </div>
         </div>
       </header>
-      {access === "frozen" && (
+      {access === "frozen" && user.switchEnabled && (
         <div className="no-print border-b border-amber-200 bg-amber-50 text-sm text-amber-900">
           <p className="mx-auto max-w-5xl px-4 py-2.5">
-            Your subscription has ended, so your vault is read-only. Your release switch keeps running.{" "}
+            Your subscription has ended. Your release switch keeps running, but if you turn it off you&apos;ll need to renew to turn it back on.{" "}
             <a href="/subscribe" className="font-medium underline">Renew</a>
           </p>
         </div>

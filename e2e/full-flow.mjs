@@ -100,7 +100,7 @@ try {
   assert.match((await fetch(`${BASE}/login`)).headers.get("x-robots-tag") ?? "", /noindex/);
   await page.goto(BASE);
   await page.getByRole("link", { name: "Start your vault" }).first().waitFor();
-  await page.getByText("One plan. Everything included.").waitFor();
+  await page.getByText("Free to write. One plan to switch it on.").waitFor();
   for (const path of ["/terms", "/privacy", "/refunds"]) assert.equal((await fetch(`${BASE}${path}`)).status, 200, path);
   assert.match(await (await fetch(`${BASE}/terms`)).text(), /Paddle\.com is the Merchant of Record/);
   await shot("01-landing");
@@ -126,34 +126,11 @@ try {
   await page.goto(loginLink);
   await page.goto(loginLink); // simulate scanner prefetch + real click
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.waitForURL("**/subscribe");
+  await page.waitForURL("**/onboarding");
   const [attr] = await sql`select id, signup_source, signup_campaign from users where email=${owner}`;
   assert.equal(attr.signup_source, "crypto");
   assert.equal(attr.signup_campaign, "utm_source=e2e&utm_campaign=launch");
   const ownerId = attr.id;
-
-  step("no subscription → only the subscribe page");
-  await page.getByRole("heading", { name: "Start your vault" }).waitFor();
-  assert.match(await page.getByTestId("plan-price").innerText(), /€39/);
-  await shot("02b-subscribe");
-  for (const path of ["/dashboard", "/onboarding", "/vault", "/contacts/new"]) {
-    await page.goto(`${BASE}${path}`);
-    await page.waitForURL("**/subscribe");
-  }
-  assert.match((await fetch(`${BASE}/subscribe`, { redirect: "manual" })).headers.get("content-security-policy") ?? "", /frame-src https:\/\/buy\.paddle\.com/);
-  assert.doesNotMatch((await fetch(`${BASE}/login`)).headers.get("content-security-policy") ?? "", /paddle/, "Paddle only on /subscribe");
-
-  step("Paddle webhooks: signature required");
-  const created = subscriptionEvent("subscription.created", { status: "active", minutes: 1, userId: ownerId });
-  assert.equal((await fetch(`${BASE}/api/paddle/webhook`, { method: "POST", body: JSON.stringify(created) })).status, 401);
-  assert.equal((await paddleWebhook(created, "wrong-secret")).status, 401);
-  assert.equal((await sql`select billing_status from users where id=${ownerId}`)[0].billing_status, "none");
-
-  step("subscription.created → access, then onboarding");
-  assert.equal((await paddleWebhook(created)).status, 200);
-  assert.equal((await paddleWebhook(created)).status, 200, "a repeated event is harmless");
-  await page.goto(`${BASE}/subscribe`);
-  await page.waitForURL("**/onboarding");
 
   step("onboarding is required for new users; crypto ad → wallet suggestions");
   await page.goto(`${BASE}/dashboard`);
@@ -191,7 +168,7 @@ try {
   await shot("03-onboarding-3");
 
   step("onboarding phase 3: tooltips explain the choice; choose check-ins and finish");
-  assert.ok(await page.getByRole("button", { name: "Finish setup" }).isDisabled(), "a choice is required");
+  assert.ok(await page.getByRole("button", { name: "Finish and activate" }).isDisabled(), "a choice is required");
   const claimInfo = page.getByRole("button", { name: "What does “Contacts can claim” mean?" });
   await claimInfo.hover();
   await page.getByRole("tooltip").filter({ hasText: "We never email you on a schedule" }).waitFor();
@@ -204,11 +181,43 @@ try {
   assert.equal(await page.getByRole("radio", { name: /Contacts can claim/ }).isChecked(), false);
   await page.keyboard.press("Escape");
   await page.getByRole("radio", { name: /Periodic check-ins/ }).check();
-  await page.getByRole("button", { name: "Finish setup" }).click();
-  await page.waitForURL("**/dashboard?welcome=1");
-  await page.getByText("You're all set").waitFor();
-  await page.getByText("Your switch is active").waitFor();
+  await page.getByText("Next, activate your switch").waitFor();
+  await page.getByRole("button", { name: "Finish and activate" }).click();
+
+  step("without a subscription the switch stays off; activating it goes to the subscribe page");
+  await page.waitForURL("**/subscribe?welcome=1");
+  await page.getByRole("heading", { name: "Your vault is ready" }).waitFor();
+  assert.match(await page.getByTestId("plan-price").innerText(), /€39/);
+  await shot("03b-subscribe");
+  assert.equal((await sql`select switch_enabled, switch_mode from users where id=${ownerId}`)[0].switch_enabled, false);
   assert.equal(emailsTo(anna), 1, "anna gets 'you were added' email");
+  await page.getByRole("link", { name: "Not now — back to my vault" }).click();
+  await page.waitForURL("**/dashboard");
+  await page.getByText("Your vault is ready — activate your release switch").waitFor();
+  await page.goto(`${BASE}/settings`);
+  await page.getByText("Not subscribed").waitFor();
+  await page.getByLabel(/Switch is off/).check();
+  await page.getByRole("button", { name: "Save and subscribe to turn it on" }).click();
+  await page.waitForURL("**/subscribe");
+  await page.getByRole("heading", { name: "Activate your release switch" }).waitFor();
+  assert.equal((await sql`select switch_enabled from users where id=${ownerId}`)[0].switch_enabled, false, "still off");
+  assert.match((await fetch(`${BASE}/subscribe`, { redirect: "manual" })).headers.get("content-security-policy") ?? "", /frame-src https:\/\/buy\.paddle\.com/);
+  assert.doesNotMatch((await fetch(`${BASE}/login`)).headers.get("content-security-policy") ?? "", /paddle/, "Paddle only on /subscribe");
+
+  step("Paddle webhooks: signature required");
+  const created = subscriptionEvent("subscription.created", { status: "active", minutes: 1, userId: ownerId });
+  assert.equal((await fetch(`${BASE}/api/paddle/webhook`, { method: "POST", body: JSON.stringify(created) })).status, 401);
+  assert.equal((await paddleWebhook(created, "wrong-secret")).status, 401);
+  assert.equal((await sql`select billing_status from users where id=${ownerId}`)[0].billing_status, "none");
+
+  step("paying turns the switch on with the chosen settings");
+  assert.equal((await paddleWebhook(created)).status, 200);
+  assert.equal((await paddleWebhook(created)).status, 200, "a repeated event is harmless");
+  const [paid] = await sql`select billing_status, switch_enabled, switch_mode from users where id=${ownerId}`;
+  assert.deepEqual([paid.billing_status, paid.switch_enabled, paid.switch_mode], ["active", true, "checkin"]);
+  await page.goto(`${BASE}/subscribe`);
+  await page.waitForURL("**/dashboard");
+  await page.getByText("Your switch is active").waitFor();
   await shot("03-dashboard-after-onboarding");
   await page.goto(`${BASE}/onboarding`);
   await page.waitForURL("**/dashboard");
@@ -519,39 +528,38 @@ try {
   await anon.goto(`${BASE}/dashboard`);
   assert.ok(anon.url().endsWith("/login"));
 
-  step("subscription ends → vault read-only, release switch keeps running");
+  step("subscription ends → the switch keeps running; everything else stays free");
   await page.goto(`${BASE}/settings`);
   await page.getByText(/Renews on 4 November 2027/).waitFor();
   assert.equal((await paddleWebhook(subscriptionEvent("subscription.canceled", { status: "canceled", minutes: 10, userId: ownerId }))).status, 200);
-  await page.goto(`${BASE}/vault`);
-  await page.getByText("Your subscription has ended, so your vault is read-only").waitFor();
-  assert.equal(await page.getByRole("button", { name: "+ Add" }).count(), 0, "no adding when lapsed");
-  await page.locator("aside nav button").first().click();
-  assert.equal(await page.locator("textarea[name=notes]").isDisabled(), true, "fields are read-only");
-  assert.equal(await page.getByRole("button", { name: "Save changes" }).count(), 0);
-  await shot("19-frozen-vault");
-  await page.goto(`${BASE}/contacts`);
-  assert.equal(await page.getByRole("link", { name: "+ Add contact" }).count(), 0);
-  await page.goto(`${BASE}/contacts/new`);
-  await page.waitForURL("**/subscribe");
-  await page.getByRole("heading", { name: "Your subscription has ended" }).waitFor();
   assert.equal((await sql`select switch_enabled from users where id=${ownerId}`)[0].switch_enabled, true, "switch still on");
+  await page.goto(`${BASE}/vault`);
+  await page.getByText("Your subscription has ended. Your release switch keeps running").waitFor();
+  await page.getByRole("button", { name: "+ Add" }).waitFor(); // editing stays free
+  await shot("19-lapsed");
+
+  step("once turned off, turning it back on needs a renewal");
   await page.goto(`${BASE}/settings`);
-  await page.getByText("It keeps running while your subscription is inactive").waitFor();
-  page.once("dialog", (d) => d.accept());
-  await page.getByRole("button", { name: "Turn off the switch" }).click();
-  await page.getByText("Your release switch is off.").waitFor();
+  await page.getByLabel(/Switch is on/).uncheck();
+  await page.getByRole("button", { name: "Save switch settings" }).click();
+  await page.getByText("Saved. Your timer starts from today.").waitFor();
+  assert.equal((await sql`select switch_enabled from users where id=${ownerId}`)[0].switch_enabled, false);
+  await page.reload();
+  await page.getByLabel(/Switch is off/).check();
+  await page.getByRole("button", { name: "Save and subscribe to turn it on" }).click();
+  await page.waitForURL("**/subscribe");
+  await page.getByRole("heading", { name: "Renew your subscription" }).waitFor();
   assert.equal((await sql`select switch_enabled from users where id=${ownerId}`)[0].switch_enabled, false);
 
-  step("late webhooks are ignored; renewing (new subscription) restores access");
+  step("late webhooks are ignored; renewing (new subscription) turns the switch back on");
   await paddleWebhook(subscriptionEvent("subscription.updated", { status: "active", minutes: 5, userId: ownerId }));
   assert.equal((await sql`select billing_status from users where id=${ownerId}`)[0].billing_status, "canceled", "older event ignored");
   const renewed = { id: "sub_e2eb", status: "active", minutes: 20 }; // no custom data: found by customer id
   assert.equal((await paddleWebhook(subscriptionEvent("subscription.created", renewed))).status, 200);
   await paddleWebhook(subscriptionEvent("subscription.updated", { status: "canceled", minutes: 30, userId: ownerId }));
-  assert.equal((await sql`select billing_status from users where id=${ownerId}`)[0].billing_status, "active", "the old subscription ending doesn't remove access");
-  await page.goto(`${BASE}/vault`);
-  await page.getByRole("button", { name: "+ Add" }).waitFor();
+  const [again] = await sql`select billing_status, switch_enabled from users where id=${ownerId}`;
+  assert.equal(again.billing_status, "active", "the old subscription ending doesn't remove access");
+  assert.equal(again.switch_enabled, true, "renewing turned the switch back on");
   await page.goto(`${BASE}/settings`);
   await paddleWebhook(subscriptionEvent("subscription.updated", { ...renewed, minutes: 40, cancel: true }));
   await page.reload();

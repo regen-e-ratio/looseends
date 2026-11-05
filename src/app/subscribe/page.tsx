@@ -10,9 +10,9 @@ import { SubscribeCheckout } from "./subscribe-checkout";
 
 export const metadata = { title: "Subscribe" };
 
-/** The paywall: every account needs a subscription. Lapsed accounts renew here too. */
-export default async function SubscribePage() {
-  const user = await requireUser();
+/** Activating the release switch: the only thing a subscription is needed for. Lapsed accounts renew here too. */
+export default async function SubscribePage({ searchParams }: PageProps<"/subscribe">) {
+  const [user, sp] = await Promise.all([requireUser(), searchParams]);
   const access = accessLevel(user);
   if (access === "member") redirect(startPage(user));
   const checkout = checkoutSettings();
@@ -22,11 +22,13 @@ export default async function SubscribePage() {
       <Logo />
       <div className="mt-8 w-full max-w-md space-y-6 rounded-xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="space-y-2">
-          <h1 className="text-xl font-semibold">{access === "frozen" ? "Your subscription has ended" : "Start your vault"}</h1>
+          <h1 className="text-xl font-semibold">
+            {access === "frozen" ? "Renew your subscription" : sp.welcome ? "Your vault is ready" : "Activate your release switch"}
+          </h1>
           <p className="text-stone-600">
             {access === "frozen"
-              ? "Your vault is safe and your release switch is still running, but you can't make changes. Renew to update your vault and contacts again."
-              : "One plan with everything. Set it up once, keep it up to date when life changes."}
+              ? "Renew to turn your release switch back on and keep it running."
+              : "Writing your vault is free. Subscribe to switch it on, so it reaches your people if something happens to you. Your switch turns on as soon as you've paid, with the settings you chose."}
           </p>
         </div>
 
@@ -66,7 +68,10 @@ export default async function SubscribePage() {
           </p>
         </div>
       </div>
-      <form action={logoutAction} className="mt-6 text-sm text-stone-500">
+      <Link href={user.onboardedAt ? "/dashboard" : "/onboarding"} className="mt-6 text-sm font-medium text-teal-800 hover:underline">
+        Not now — back to my vault
+      </Link>
+      <form action={logoutAction} className="mt-3 text-sm text-stone-500">
         Signed in as {user.email} ·{" "}
         <button className="underline hover:text-stone-700">Sign out</button>
       </form>

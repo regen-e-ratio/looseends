@@ -1,11 +1,11 @@
 import { ContactForm } from "@/components/contact-form";
 import { PageHeader } from "@/components/ui";
-import { requireMember } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 
 export const metadata = { title: "Add contact" };
 
 export default async function NewContactPage() {
-  const user = await requireMember();
+  const user = await requireUser();
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader title="Add a trusted contact" description="Someone you trust to handle your affairs — a partner, family member, friend or executor." />

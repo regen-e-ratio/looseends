@@ -18,7 +18,7 @@ function Terminal({ from }: AdProps) {
       className={mono.className}
       logo={{ bg: "#F7931A", fg: "#050505", text: "#E6E6E6" }}
       style={{ background: "#050505", color: "#E6E6E6" }}
-      footer="€39/yr · no seed phrases · no wallet connections · no KYC"
+      footer="free to start · no seed phrases · no wallet connections · no KYC"
     >
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-[0.06]"

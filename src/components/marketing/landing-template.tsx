@@ -113,16 +113,16 @@ export function LandingTemplate({ page, signedIn = false }: { page: LandingPage;
         <section id="pricing" className="scroll-mt-8 border-b border-stone-200">
           <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:py-20 lg:grid-cols-2">
             <div>
-              <h2 className="text-3xl font-semibold tracking-tight">One plan. Everything included.</h2>
+              <h2 className="text-3xl font-semibold tracking-tight">Free to write. One plan to switch it on.</h2>
               <p className="mt-3 max-w-xl text-lg text-stone-600">
-                No tiers and no limits. Cancel anytime — and if a payment ever fails after you&apos;re gone, your instructions are still
-                delivered.
+                Create your vault and add your people for free. Subscribe when you&apos;re ready to turn on the release switch. Cancel
+                anytime — and if a payment ever fails after you&apos;re gone, your instructions are still delivered.
               </p>
             </div>
             <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
               <p className="flex flex-wrap items-baseline gap-x-2">
                 <span className="text-4xl font-semibold tracking-tight">{PLAN.eur}</span>
-                <span className="text-stone-500">per {PLAN.period}</span>
+                <span className="text-stone-500">per {PLAN.period} to switch it on</span>
                 <span className="text-sm text-stone-500">· {PLAN.usd} in the US</span>
               </p>
               <p className="mt-1 text-sm text-stone-500">EU prices include VAT. US sales tax is added at checkout.</p>

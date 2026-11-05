@@ -15,7 +15,7 @@ function BrightFintech({ from }: AdProps) {
       className={grotesk.className}
       logo={{ bg: "#6D28D9", fg: "#fff", text: "#0F172A" }}
       style={{ background: "#FAFAFF", color: "#0F172A" }}
-      footer="€39 a year · Takes 15 minutes · We never ask for logins"
+      footer="Free to start · Takes 15 minutes · We never ask for logins"
     >
       <div className="pointer-events-none absolute -right-40 -top-40 -z-10 h-[40rem] w-[40rem] rounded-full opacity-70 blur-3xl" style={{ background: "radial-gradient(circle, #C4B5FD, transparent 65%)" }} />
       <div className="pointer-events-none absolute -bottom-48 left-1/4 -z-10 h-[34rem] w-[34rem] rounded-full opacity-60 blur-3xl" style={{ background: "radial-gradient(circle, #7DD3FC, transparent 65%)" }} />

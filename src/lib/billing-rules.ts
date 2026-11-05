@@ -2,12 +2,13 @@
  * Subscription rules. Pure functions (no database, no network), unit-tested in billing-rules.test.ts.
  * src/lib/billing.ts talks to Paddle and the database.
  *
+ * Everyone can write a vault and add contacts for free. A subscription is what turns the release switch on.
  * Access levels:
- * - member: a paid (or trialing, or retrying a failed payment) subscription. Full use of the app.
- * - frozen: subscribed before, but the subscription ended. The vault and contacts are read-only, but the
- *   release switch keeps working: when someone dies their card stops working, and that must never stop
- *   their instructions from reaching their people.
- * - none:   never subscribed. Only the subscribe page.
+ * - member: a paid (or trialing, or retrying a failed payment) subscription. Can turn the switch on.
+ * - frozen: subscribed before, but the subscription ended. A switch that is on keeps working (when someone dies
+ *   their card stops working, and that must never stop their instructions from reaching their people), but
+ *   once turned off it can't be turned back on without renewing.
+ * - none:   never subscribed. Can't turn the switch on.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";

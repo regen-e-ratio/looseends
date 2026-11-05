@@ -7,7 +7,7 @@ function FamilyLetter({ from }: AdProps) {
     <AdFrame
       logo={{ bg: "#7A2E3B", fg: "#FBF6EC", text: "#3B2A2A" }}
       style={{ background: "radial-gradient(120% 90% at 70% 40%, #FFFBF3 0%, #F7EEDD 55%, #EADBC0 100%)", color: "#3B2A2A" }}
-      footer="€39 a year · Private and encrypted · No passwords to remember"
+      footer="Free to start · Private and encrypted · No passwords to remember"
     >
       <div className="grid w-full items-center gap-8 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
         <div>

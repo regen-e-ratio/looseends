@@ -68,7 +68,7 @@ Project → **Settings → Domains** → add `yourdomain.com` (or `app.yourdomai
 4. In Vercel → **Settings → Cron Jobs**, you should see `/api/cron/check-switches` scheduled daily.
 
 ## Step 7: Payments with Paddle
-Every account needs a subscription. Until the four `PADDLE_*` variables below are set, the subscribe page says "Subscriptions open very soon" and nobody can get past it.
+Accounts, vaults and contacts are free; a subscription turns the release switch on. Until the four `PADDLE_*` variables below are set, the subscribe page says "Subscriptions open very soon", so nobody can turn a switch on.
 
 ### 7a. Test with Paddle's sandbox (about 20 minutes, no approval needed)
 The sandbox is a separate Paddle account where nothing is real: test cards, no money.
@@ -102,7 +102,7 @@ The sandbox is a separate Paddle account where nothing is real: test cards, no m
    | `LEGAL_ADDRESS` | your business address (required in the EU for the privacy notice) |
    | `SUPPORT_EMAIL` | an address you read (defaults to `support@looseends.life`, which only works if you set up forwarding for it) |
 
-9. **Test:** `/api/health` shows `"payments": "sandbox"`. Sign up with a new email and pay with card **4242 4242 4242 4242**, any future expiry date, any CVC. You should land in onboarding within a few seconds. In *Settings → Manage subscription* you can see the invoice and cancel; Settings then says when it ends.
+9. **Test:** `/api/health` shows `"payments": "sandbox"`. Sign up with a new email and pay with card **4242 4242 4242 4242**, any future expiry date, any CVC. Finish onboarding with a contact first; after paying, your switch turns on within a few seconds. In *Settings → Manage subscription* you can see the invoice and cancel; Settings then says when it ends.
 
 ### 7b. Go live (Paddle reviews your account; usually a few days)
 1. Upgrade Vercel to **Pro** (commercial use) and Resend to **Pro** when you expect more than 100 emails a day.
